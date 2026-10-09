@@ -1,7 +1,9 @@
 import base64
+import hashlib
 import io
 from pathlib import Path
 import shutil
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch,MagicMock
@@ -60,6 +62,7 @@ class LocalVoiceTests(unittest.TestCase):
         files = []
         def synthesis(command, **kwargs):
             self.assertNotIn("shell", kwargs)
+            self.assertEqual(str(executable), command[0])
             target = Path(command[command.index("-w") + 1])
             files.append(target)
             process=MagicMock(returncode=0)
@@ -69,8 +72,13 @@ class LocalVoiceTests(unittest.TestCase):
                 target.write_bytes(wav())
             process.communicate.side_effect=communicate
             return process
-        with patch.object(voice.shutil, "which", return_value="/usr/bin/espeak-ng"), patch.object(voice.subprocess, "Popen", side_effect=synthesis):
-            result = voice.speak({"text": "--help; $(touch /tmp/never-execute)"})
+        with tempfile.TemporaryDirectory(prefix="letmecook-test-engine-") as folder:
+            executable = Path(folder) / "espeak-ng"
+            engine_bytes = b"authored local speech engine fixture\n"
+            executable.write_bytes(engine_bytes)
+            with patch.object(voice.shutil, "which", return_value=str(executable)), patch.object(voice.subprocess, "Popen", side_effect=synthesis):
+                result = voice.speak({"text": "--help; $(touch /tmp/never-execute)"})
+        self.assertEqual(hashlib.sha256(engine_bytes).hexdigest(), result["engineVersion"])
         self.assertEqual(wav(), base64.b64decode(result["audioBase64"]))
         self.assertEqual("audio/wav", result["mimeType"])
         self.assertFalse(files[0].exists())
