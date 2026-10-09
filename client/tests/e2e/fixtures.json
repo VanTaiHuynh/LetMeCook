@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "local-e2e.v1",
+  "credentials": "Provided in memory by the release QA owner; no real credentials stored.",
+  "actors": [
+    {
+      "alias": "owner",
+      "scope": "personal and household owner"
+    },
+    {
+      "alias": "viewer",
+      "scope": "accepted household viewer"
+    }
+  ],
+  "recipe": {
+    "title": "QA source soup",
+    "visibility": "private",
+    "steps": [
+      "Stir for 2 minutes.",
+      "Rest for 30 seconds, then serve."
+    ],
+    "originalImage": "Use owned local QA fixture only; no generated or external image download."
+  },
+  "cookSession": {
+    "status": "active",
+    "version": 1,
+    "stepIndex": 0,
+    "timers": []
+  },
+  "clarification": {
+    "contractVersion": "local-ai.v2",
+    "status": "needs_clarification",
+    "intent": {
+      "allergies": [
+        "peanut"
+      ],
+      "dietaryPreferences": [
+        "vegan"
+      ],
+      "maxCookingTime": 30
+    },
+    "clarification": {
+      "questions": [
+        {
+          "id": "dish",
+          "question": "What kind of soup?"
+        }
+      ],
+      "context": "Use a signed context returned by the real local worker; never invent a signature."
+    }
+  },
+  "faults": [
+    {
+      "route": "GET /api/recipes/:id",
+      "firstStatus": 500,
+      "retryStatus": 200
+    },
+    {
+      "route": "GET /api/account/favorites?page=0&size=24",
+      "status": 503
+    },
+    {
+      "route": "PATCH /api/kitchen/sessions/:id",
+      "status": 409
+    }
+  ],
+  "cleanup": "Release QA owner deletes only newly created QA actors/scope/session/fixture records and restores owned temporary flags."
+}

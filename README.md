@@ -1,4 +1,64 @@
-# LetMeCook — Full Project Setup Guide (EN)
+# LetMeCook — Local AI deployment
+
+## Local AI release
+
+The current deployment uses **Supabase local + Ollama local**. Sunny supports
+Vietnamese/English recipe requests and ingredient photos with human confirmation,
+and returns actual public catalog recipes with original photos in local Supabase Storage.
+No OpenAI API key is required. Model prompts/photos stay on the local machine.
+
+Run `bash deploy/local-up.sh` from a writable checkout. This expects Docker
+Compose, Supabase CLI, Python3, curl, and an existing local Ollama service. It checks
+or downloads `qwen3:8b` and `qwen3-vl:4b-instruct`, imports source evidence, applies the
+atomic `save_recipe` migration, and starts the app under UID/GID1005:1005.
+
+- App: http://localhost:9401 — Sunny: http://localhost:9401/sunny
+- Supabase Studio: http://localhost:56423
+- Detailed operation and limits: [deploy/README-local-ai.txt](deploy/README-local-ai.txt)
+- Local status: `bash deploy/local-status.sh`
+
+## Current source release
+
+This repository contains the complete React frontend, Spring Boot backend,
+Python recommendation/AI worker, database schema and migrations, deployment
+scripts, tests, and product/design specifications.
+
+The current English website includes recipe discovery, Sunny AI, weekly meal
+planning and shopping lists, account kitchen features, and Cook Along inside
+recipe details. Cook Along supports spoken steps and automatic timed flow;
+stated recipe waits are filled in automatically and can be edited or reset.
+Favorites, saved plans and other account data require sign-in.
+
+- Public website: [letmecook.ca](https://letmecook.ca)
+- Public-origin tooling: [deploy/domain/README.txt](deploy/domain/README.txt)
+- Recipe ingestion source: [tools/ingestion/README.txt](tools/ingestion/README.txt)
+- Release operations: [docs/product/release-2026-10-08.md](docs/product/release-2026-10-08.md)
+- Quality checks: [.github/workflows/quality.yml](.github/workflows/quality.yml)
+
+Git contains source and branding assets. Operator credentials, database backups,
+the scraped recipe corpus/original-photo library, AI model weights, generated
+indexes/audio caches, and compiled builds remain outside Git. For an existing
+catalog deployment, restore the protected database/Storage backup or provide
+`deploy/data/recipes.jsonl` and `client/public/recipe-images/` before following the
+local provisioning guide. Model and index provisioning instructions are in
+`deploy/README-local-ai.txt`, `deploy/README-hybrid-index.txt`, and the release guide.
+An empty source checkout can build and run tests without the production catalog.
+
+The catalog contains10,000 recipe records with their original published photos
+stored in the server's persistent Supabase Storage volume. Branding images also
+use Supabase Storage. Existing recipe image URLs remain stable through the web
+gateway, which checks recipe visibility before fetching from the private bucket.
+Publisher diet evidence is preserved; missing labels are not
+invented. Ingredient matching is not an allergy-safety certification. Repository
+and dataset reuse rights have not been established from a supplied licence.
+
+## Historical setup documentation
+
+The instructions below describe the original cloud implementation. They are
+retained for project history and are superseded by the local deployment guide
+above; the former OpenAI service/configuration has been replaced.
+
+### Original full project setup guide (EN)
 
 **Goal:** Run the complete system locally: **Backend (Spring Boot)** · **Frontend (Vite/React)** · **Database (Supabase/Postgres)** · **Recommendation System (Python)**.  
 **Audience:** New developers who just cloned the repo and want a fast, reliable local setup, with pointers for production.
@@ -337,3 +397,11 @@ npm run dev
 - Avoid logging secrets (tokens/keys) in any environment.
 
 ---
+
+## Product showcase and MVP planning
+
+The landing page is a short product showcase: Sunny text/photo search, source-linked recipes, favorites with an account, one featured recipe collection, and an account CTA. It uses the existing English Raleway, cream/yellow palette and Sunny mascot throughout the app.
+
+Detailed product planning belongs in [docs/product/mvp-plan.json](docs/product/mvp-plan.json), rather than on the landing page. This English specification records the six proposed capabilities, their current/planned boundaries, the 12-week implementation sequence, pilot definitions, business hypotheses and evaluation gates. Saved pantries, meal planning, what-if explanations, cook-along, household sharing and the Evidence Console remain planned. Existing Sunny text search, photo ingredient review, recipe browsing and account features can be demonstrated now.
+
+The original planning PDF/ZIP and English product brief remain in `client/public/startup/` as project resources. They are not linked from the showcase. Pilot targets are goals, not measured customer traction.

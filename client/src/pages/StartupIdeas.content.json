@@ -1,0 +1,306 @@
+{
+  "language": "en",
+  "purpose": "Current English local MVP capability inventory; pilot and commercial hypotheses remain proposals",
+  "plan_status": "Implemented local MVP; rights, interviews, pilot outcomes and willingness to pay remain unverified",
+  "intro": {
+    "eyebrow": "Your connected kitchen",
+    "title": "From your pantry to dinner.",
+    "description": "Review your ingredients, plan your dinners, buy what is missing and cook with source-grounded help from Sunny.",
+    "customer": "For busy households of 2–4 people who cook at home regularly. The pilot region and participant group are still to be selected.",
+    "value_hypothesis": "A pantry you can trust, a plan that respects your needs and support while cooking could make dinner easier to decide and worth coming back for.",
+    "value_points": [
+      {
+        "title": "Less effort choosing dinner",
+        "description": "Start with your ingredients and today's needs, then see a few options with clear reasons."
+      },
+      {
+        "title": "Buy what is missing",
+        "description": "See what you have, what you need and what still needs checking before you shop."
+      },
+      {
+        "title": "Cook through to the last step",
+        "description": "Follow the recipe, confirm the meal and record what you used for next time."
+      }
+    ]
+  },
+  "features_intro": {
+    "title": "Six ideas. One connected kitchen.",
+    "description": "A connected local kitchen workflow, from confirmed pantry stock to dinner and your shared shopping list.",
+    "status_label": "Available locally",
+    "detail_label": "Explore the feature"
+  },
+  "features": [
+    {
+      "id": "F01",
+      "name": "A real pantry",
+      "title": "A pantry that knows what you have.",
+      "description": "Take a photo, correct the ingredients and keep an editable pantry. Add amounts and dates yourself, and choose what you want to use first.",
+      "detail": "Available ingredients help suggest meals. You choose separately what must be used in every meal or in at least one meal of a plan. Photos cannot tell us amounts, freshness or expiry dates; unknown details stay visible.",
+      "current_note": "Editable confirmed pantry lots, unknown amounts, use-by dates, revision checks and measured coverage are implemented.",
+      "status": "implemented_local",
+      "route": "/pantry"
+    },
+    {
+      "id": "F02",
+      "name": "A plan for three dinners",
+      "title": "Your dinners, from what you have.",
+      "description": "Plan dinners around the number of people, your time and food preferences. Prioritize what needs using and see what is missing.",
+      "detail": "The plan would account for what each meal uses, so the same stock is not counted twice. Shopping amounts need clear quantities and compatible units. A budget can only be checked with suitable prices, pack sizes and complete price coverage.",
+      "current_note": "Plan one, three or seven dinners with explicit preferences, exclusions, positive must-use allocations and verifiable pack-price budgets.",
+      "status": "implemented_local",
+      "route": "/meal-planner"
+    },
+    {
+      "id": "F03",
+      "name": "What-if and clear explanations",
+      "title": "Change your plans. See what changes.",
+      "description": "Have 15 minutes instead of 25? Feeding one more person? Compare the meals, portions and shopping list.",
+      "detail": "See the needs we understood, what you have, what is missing and what is unknown. Exclusions stay in place. If no option fits, you decide whether to change your request.",
+      "current_note": "Deterministic What-if preview and Apply preserve hard requirements. Price quotes remain pinned until an explicit refresh.",
+      "status": "implemented_local",
+      "route": "/meal-planner"
+    },
+    {
+      "id": "F04",
+      "name": "Sunny Cook-along",
+      "title": "Sunny beside you, one step at a time.",
+      "description": "Keep your place, set timers and ask about the recipe you chose. Check the source behind the answer.",
+      "detail": "Resume your cooking step after reloading. Questions beyond the recipe would be marked as unknown; AI would not invent amounts or temperatures, or judge whether food is cooked from a photo. Confirm what you used before your pantry is updated.",
+      "current_note": "Immutable source steps, resumable timers, extractive cited answers, explicit completion and local opt-in voice are implemented.",
+      "status": "implemented_local",
+      "route": "/recipes/:recipeId?cook=1"
+    },
+    {
+      "id": "F05",
+      "name": "A shared household kitchen",
+      "title": "One kitchen. One shared plan.",
+      "description": "Share a pantry and shopping list with people in your household. Choosing dinner and buying ingredients can follow the same plan.",
+      "detail": "People accept an invitation before getting access. Simultaneous changes would be checked, and retrying an action would not use the same ingredients twice. Recording a cooked meal always needs your confirmation.",
+      "current_note": "Owner/editor/viewer roles, expiring one-use invitations, shared shopping versions and atomic consumption are implemented behind a release control.",
+      "status": "implemented_local",
+      "route": "/household"
+    },
+    {
+      "id": "F06",
+      "name": "Evidence Console",
+      "title": "Learn from meals people actually cook.",
+      "description": "Track confirmed meals, returning households and task results. Improve the product from what people find useful.",
+      "detail": "Figures would show the trial group, observation period and totals behind each percentage. Opening a recipe does not count as cooking it. Using ingredients near a chosen date is a signal; actual waste reduction or savings need separate measurements.",
+      "current_note": "Opt-in confirmed cooking evidence, named enrollment, fixed week-4 windows, export, deletion and 90-day retention are implemented; no real pilot result is claimed.",
+      "status": "implemented_local",
+      "route": "/evidence"
+    }
+  ],
+  "planned_journey": {
+    "label": "Planned experience",
+    "steps": [
+      {
+        "number": 1,
+        "title": "Check your pantry",
+        "description": "Review and confirm your ingredients."
+      },
+      {
+        "number": 2,
+        "title": "Choose dinner",
+        "description": "Keep your requirements in place."
+      },
+      {
+        "number": 3,
+        "title": "Buy what is missing",
+        "description": "Use real amounts and flag unknowns."
+      },
+      {
+        "number": 4,
+        "title": "Cook and confirm",
+        "description": "Record the meal and what you used."
+      }
+    ]
+  },
+  "sunny_now": {
+    "status_label": "Available now",
+    "title": "Start with Sunny today.",
+    "description": "Describe what you want in English or Vietnamese, or upload a photo and confirm the ingredients. Sunny searches real recipes and shows the conditions it understood.",
+    "capabilities": [
+      "Search by ingredients, cooking time and dietary preferences.",
+      "Review and edit ingredients detected in a photo before searching.",
+      "Explore recipes with source links and original images stored locally.",
+      "Save favourites when signed in."
+    ],
+    "examples": [
+      "I have chicken and mushrooms, without peanuts.",
+      "A vegetarian tofu meal in under 30 minutes.",
+      "Tomato salad without eggs."
+    ],
+    "example_note": "The request opens in Sunny for you to review before searching.",
+    "cta": "Try Sunny",
+    "catalog_note": "The current local catalog is for private technical testing. Public demos need verified rights to their code, recipes and original photos.",
+    "account_note": "Creating an app account does not sign you up for the pilot."
+  },
+  "local_ai": {
+    "title": "AI understands the request. You make the choice.",
+    "description": "Sunny combines local AI with recipe data and explicit search conditions. We still need to measure how much it helps people choose and cook dinner.",
+    "points": [
+      {
+        "title": "Models on a local server",
+        "description": "Sunny uses pretrained models to understand text and photos and help rank recipes. These are existing models, not proprietary models trained by LetMeCook."
+      },
+      {
+        "title": "Local processing for Sunny requests",
+        "description": "Sunny's inference flow processes requests and ingredient photos on the local server without sending them to a cloud AI service. Recognition photos are temporary, and you confirm the ingredients."
+      },
+      {
+        "title": "Real sources and clear unknowns",
+        "description": "Sunny searches the recipe catalog. Missing information stays visible, and unmet requirements should be reported. Ingredient detection and exclusions do not certify allergy safety."
+      }
+    ],
+    "connection_note": "Your browser needs a connection to the local server. A fully offline phone experience is not implemented."
+  },
+  "roadmap": {
+    "title": "A plan for 12 weeks. One useful meal first.",
+    "status_label": "Proposed roadmap",
+    "description": "The plan assumes two full-time engineers and a founder handling research and content. Each stage has release checks; pilot timing also depends on recruitment.",
+    "stages": [
+      {
+        "weeks": "01–02",
+        "title": "Understand the problem",
+        "description": "Interview 15 home cooks, clarify code and content rights, and prepare 20 demo recipes with original photos."
+      },
+      {
+        "weeks": "03–04",
+        "title": "Build the pantry",
+        "description": "Add confirmed pantry entries, prepare 100 reviewed pilot recipes and test ingredient entry."
+      },
+      {
+        "weeks": "05–06",
+        "title": "Choose one dinner",
+        "description": "Plan a single meal, compare changed requirements and build a shopping list with unknown amounts clearly marked."
+      },
+      {
+        "weeks": "07–08",
+        "title": "Complete the cooking loop",
+        "description": "Add cooking guidance, questions about the selected recipe and meal confirmation. Check permissions, privacy and readiness before onboarding."
+      },
+      {
+        "weeks": "09–10",
+        "title": "Try it in real kitchens",
+        "description": "Begin with a personal, single-meal pilot. Add three meals, priced budgets and sharing only after their checks pass. Record which features each household used."
+      },
+      {
+        "weeks": "11–12",
+        "title": "Learn from use",
+        "description": "Fix pilot issues, report groups with a full 28 days of observation, and prepare the demo and startup evidence. A delayed pilot means a later report."
+      }
+    ],
+    "scope_note": "The initial pilot uses a catalog with verified content rights, one meal and questions about the selected recipe. Shared access, strict budgets and saved private recipe or photo uploads are outside that first release."
+  },
+  "pilot": {
+    "title": "20 households. Four weeks. A question to test.",
+    "description": "A proposed pilot with busy households that regularly cook at home. The region and participant group will be selected. Interviews, assigned tasks and confirmed meals would help us decide what to build further.",
+    "status_label": "Targets only — no pilot results yet",
+    "metrics": [
+      {
+        "id": "activation7d",
+        "target": "≥60%",
+        "title": "First meal within 7 days",
+        "definition": "Households confirming a first cooked meal within 7 days / households onboarded in the same trial group.",
+        "note": "Report after the observation window is complete. This would be 12 of 20 households if all 20 are eligible."
+      },
+      {
+        "id": "retentionW4",
+        "target": "≥35%",
+        "title": "Cooking again in week 4",
+        "definition": "Households with at least one confirmed cooked meal on days 22–28 / onboarded households with 28 full days of observation.",
+        "note": "Households without 28 days of observation are not included yet. Seven of 20 is the target when all 20 qualify."
+      },
+      {
+        "id": "confirmedMeals",
+        "target": "≥3",
+        "title": "Meals per active household each week",
+        "definition": "Meals confirmed cooked during the week / active households that week.",
+        "note": "Only meals confirmed by the user count. Recipe views do not count as cooked meals."
+      },
+      {
+        "id": "taskSuccess",
+        "target": "≥80%",
+        "title": "Tasks completed",
+        "definition": "Completed pantry-to-plan-to-shopping-to-cooking tasks / all assigned tasks.",
+        "note": "Record failures and abandoned tasks as well as successful ones."
+      }
+    ],
+    "timing_note": "The pilot is planned to start at the beginning of week 9 after readiness checks pass. Week 4 results need a full 28-day observation window; delays move the reporting date.",
+    "decision_time_note": "Target: reduce the median time to choose a meal by at least 30%, comparing the app with the household's usual method on the same task.",
+    "willingness_to_pay_note": "Ask about a proposed price and aim for 5 of 20 households agreeing to a paid pilot. Willingness to pay and completed payments are recorded separately; no revenue result is claimed.",
+    "quality_notes": [
+      "Evaluate English and Vietnamese requests, photos with several ingredients, quantity calculations and answers tied to recipe sources.",
+      "Target zero violations of explicit requirements in a reviewed recipe test set. This does not certify allergy safety beyond the available data.",
+      "Speed targets once models are ready: 95% of text requests within 8 seconds and photo requests within 30 seconds, measured across at least 100 requests. Startup and waiting time are measured separately. These are targets, not current guarantees.",
+      "Money saved or food waste avoided needs separate measurements. It cannot be inferred from recipe views or ingredients used near a chosen date."
+    ]
+  },
+  "business": {
+    "title": "A product worth returning to. A business to test.",
+    "hypothesis": "A paid household plan could bring together a saved pantry, meal planning and cooking support. Price, location and willingness to pay will be tested with users.",
+    "later_ideas": [
+      {
+        "title": "Hands-free cooking",
+        "status_label": "After the MVP",
+        "description": "Local voice input and spoken guidance for busy hands. Test Vietnamese recognition, response time and microphone permission first."
+      },
+      {
+        "title": "Reviewed ingredient swaps",
+        "status_label": "After the MVP",
+        "description": "Suggestions from reviewed ingredient data that keep your exclusions in place. Unsupported swaps would be marked as unknown."
+      },
+      {
+        "title": "Tools for creators and retailers",
+        "status_label": "When business demand is demonstrated",
+        "description": "A tailored version using permissioned recipes and reviewed Vietnamese and English ingredient names. Proceed only with customer evidence and the required distribution rights."
+      }
+    ],
+    "defensibility_hypothesis": "A connected journey from ingredients to a confirmed meal, with source explanations and a choice to run AI locally could offer value. That difference still needs testing. A large catalog or pretrained model does not prove a competitive advantage or customer traction."
+  },
+  "plan_download": {
+    "eyebrow": "Project blueprint",
+    "title": "A plan ready to work through.",
+    "description": "Explore 44 tasks with priorities, dependencies and acceptance checks, plus the product specification, a three-minute demo script, pilot plan, pitch outline and operating-cost template.",
+    "plan_cta": "Detailed planning files (Vietnamese)",
+    "download_cta": "Download the planning pack (Vietnamese)",
+    "english_brief_cta": "Download the English product brief",
+    "duration_label": "12 weeks",
+    "status_note": "Proposed plan. No startup program has been selected.",
+    "language_note": "The original detailed planning files are in Vietnamese. An English product brief accompanies them.",
+    "index": [
+      "Vision and customers",
+      "Six features and the experience",
+      "Data, AI and evaluation",
+      "Roadmap, pilot and demo",
+      "Backlog and startup evidence"
+    ]
+  },
+  "faq": [
+    {
+      "question": "Can I use the new features yet?",
+      "answer": "Local recipe search, confirmed photo search, pantry tracking, dinner planning, shopping calculations, What-if previews, cook-along, local voice, consented evidence and private branded catalogs are implemented. Household sharing depends on administrator release controls, and swaps require administrator curation approval. Public content permissions, expert endorsement and human pilot outcomes still require real evidence. A public white-label service remains gated by B2B demand and distribution rights."
+    },
+    {
+      "question": "Does local AI mean my phone works offline?",
+      "answer": "The models run on a local Linux server, and your browser needs a connection to it. A fully offline phone experience is not implemented. Sunny's inference does not use cloud AI, but the website may still load ordinary web resources such as fonts."
+    },
+    {
+      "question": "What do the pilot and catalog figures mean?",
+      "answer": "The catalog size describes the technical test collection, not the number of customers. Pilot percentages are targets, not results or promises of savings. Retention, willingness to pay and revenue need evidence from actual use."
+    },
+    {
+      "question": "How are images, content and dietary needs handled?",
+      "answer": "The local catalog has recipe sources and original photos. Public demos need clear rights to the code, recipes and images; the proposed pilot uses 100 licensed or team-created recipes. Check recipes and ingredient labels when you have allergies. Image recognition and filters do not certify food safety."
+    }
+  ],
+  "verified_release": "2026.10.08-kitchen",
+  "release_limitations": [
+    "No signed code/content/photo clearance has been supplied for public distribution.",
+    "No interview, recruited pilot, actual week-4 retention or willingness-to-pay results have been supplied.",
+    "Synthetic voice diagnostics do not establish real English/Vietnamese speech accuracy; transcripts require review.",
+    "Expert-approved substitutions and real B2B customers/distribution rights remain external evidence.",
+    "The full original SRS and referenced UI mockups are unavailable; only recovered requirements can be traced."
+  ]
+}

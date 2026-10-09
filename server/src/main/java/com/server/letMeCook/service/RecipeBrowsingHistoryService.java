@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 public class RecipeBrowsingHistoryService {
 
     private final RecipeBrowsingHistoryRepository recipeBrowsingHistoryRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private PlatformService platformService;
 
     public RecipeBrowsingHistoryService(RecipeBrowsingHistoryRepository recipeBrowsingHistoryRepository) {
         this.recipeBrowsingHistoryRepository = recipeBrowsingHistoryRepository;
@@ -22,7 +24,7 @@ public class RecipeBrowsingHistoryService {
 
     public Page<RecipeCardDTO> getRecentlyViewedRecipeCards(UUID userId, Pageable pageable) {
         return recipeBrowsingHistoryRepository
-                .findByUserIdOrderByViewedAtDesc(userId, pageable)
+                .findVisibleByUserId(userId, platformService != null && platformService.publicDemo(), pageable)
                 .map(history -> RecipeMapper.toCardDTO(history.getRecipe()));
     }
 }

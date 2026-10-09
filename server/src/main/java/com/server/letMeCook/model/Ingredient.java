@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
+@org.hibernate.annotations.BatchSize(size=50)
 @Table(name = "ingredients")
 @Getter
 @Setter

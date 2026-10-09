@@ -1,136 +1,78 @@
+import RecipeImage from "./RecipeImage";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { supabase } from "../utils/supabaseClient";
+import { normalizeRatingSummary, ratingStars } from "../utils/recipeRatings";
 
 export default function RecipeCard({
   id,
+  to,
   title,
   author,
   imageUrl,
   cookingTime,
+  ratingAverage,
+  ratingCount,
+  ratingSummary,
+  disabled = false,
 }) {
 
-  const [rating, setRating] = useState({
-    difficulty: 0,
-    time: 0,
-    cost: 0
-  });
-
-  const [loading, setLoading] = useState("true");
-
-  useEffect(() => {
-    if(!id) return;
-
-    let cancelled = false;
-
-    async function fetchAllReviews(){
-      setLoading(true);
-
-      // query all reviews for specific recipe id
-      const{ data, error } = await supabase
-        .from("review_ratings")
-        .select("category, value, reviews!inner(recipe_id)")
-        .eq("reviews.recipe_id", id);
-
-      if (error) {
-        console.error("Error fetching review ratings:", error);
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      // average out all cost, time, difficulty values
-      const categories = ["cost", "time", "difficulty"];
-      const avg = {};
-
-      // Calculate average for each category
-      categories.forEach((cat) => {
-        const values = (data || [])
-          .filter((row) => row.category === cat && Number.isFinite(Number(row.value)))
-          .map((row) => Number(row.value));
-
-        avg[cat] = values.length
-          ? values.reduce((a, b) => a + b, 0) / values.length
-          : null;
-      });
-
-      // Calculate overall average (ignoring nulls)
-      const validAverages = categories
-        .map((cat) => avg[cat])
-        .filter((v) => v != null);
-
-      avg.overall = validAverages.length
-        ? validAverages.reduce((a, b) => a + b, 0) / validAverages.length
-        : null;
-
-      if(!cancelled){
-        setRating(avg);
-        setLoading(false);
-      }
-    }
-
-    fetchAllReviews();
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  const rating = normalizeRatingSummary(ratingSummary);
 
   const renderStars = (avg) => {
-    // nothing will be shown if there is no review ratings
     if(avg == null) return null;
-
-    const fill = Math.round(avg);
     return (
-      <span className="stars" aria-hidden>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <span key={i} className={i < fill ? "star filled" : "star"}>
-            ★
-          </span>
-        ))}
-      </span>
+      <span className="stars" role="img" aria-label={`${avg.toFixed(1)} out of 5`} title={`${avg.toFixed(1)} out of 5`}>{[...ratingStars(avg)].map((star, index) => <span aria-hidden="true" key={index} className={star === '★' ? 'star filled' : 'star'}>{star}</span>)}</span>
     );
   };
 
+  const hasStoredRating = Number.isFinite(ratingAverage) && Number.isInteger(ratingCount) && ratingCount >= 0 && (ratingCount === 0 || (ratingAverage >= 1 && ratingAverage <= 5));
+  const overall = hasStoredRating ? ratingCount > 0 ? ratingAverage : null : rating.overall;
+  const overallCount = hasStoredRating ? ratingCount : rating.overallCount;
+
   return (
-    <Link to={`/recipes/${id}`} className="recipe-card">
+    <Link to={to || `/recipes/${id}`} className="recipe-card" aria-disabled={disabled || undefined} tabIndex={disabled ? -1 : undefined} onClick={event => { if (disabled) event.preventDefault(); }}>
       <div className="recipe-card-img-container">
-        <img src={imageUrl} alt={title} loading="lazy" className="blob-image" />
+        <RecipeImage src={imageUrl} alt={title} loading="lazy" className="blob-image" />
       </div>
       <div className="recipe-card-meta">
         <div className="top-half">
-          <div className="recipe-card-title">{title}</div>
+          <h3 className="recipe-card-title">{title}</h3>
           <div className="recipe-card-author">{author}</div>
+          {(hasStoredRating || Number.isInteger(ratingSummary?.overallCount)) && <div className="recipe-card-overall">{overall != null
+            ? `★ ${overall.toFixed(1)} / 5 · ${overallCount} overall ${overallCount === 1 ? "rating" : "ratings"}`
+            : "Not rated yet"}</div>}
         </div>
         <div className="bot-half">
           <div className="left">
             {rating.difficulty != null && (
               <div className="rating-row">
                 <div className="rating-category">Difficulty</div>
-                <div className="rating-stars">{loading ? "…" : renderStars(rating.difficulty)}</div>
+                <div className="rating-stars">{renderStars(rating.difficulty)}</div>
               </div>
             )}
 
             {rating.time != null && (
               <div className="rating-row">
                 <div className="rating-category">Time</div>
-                <div className="rating-stars">{loading ? "…" : renderStars(rating.time)}</div>
+                <div className="rating-stars">{renderStars(rating.time)}</div>
               </div>
             )}
 
             {rating.cost != null && (
               <div className="rating-row">
                 <div className="rating-category">Cost</div>
-                <div className="rating-stars">{loading ? "…" : renderStars(rating.cost)}</div>
+                <div className="rating-stars">{renderStars(rating.cost)}</div>
               </div>
             )}
           </div>
           <div className="right recipe-card-time">
-            {cookingTime}&nbsp;min&nbsp;
+            {cookingTime > 0 ? `${cookingTime} min` : "Time not specified"}{" "}
             <span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
                 height="20"
                 viewBox="0 0 20 20"
+                aria-hidden="true"
                 fill="none"
               >
                 <path

@@ -8,7 +8,6 @@ import lombok.Setter;
 public class UserPublicDTO {
     private String firstName;
     private String lastName;
-    private String email;
     private String aboutMe;
     private String imageUrl;
 
@@ -16,7 +15,6 @@ public class UserPublicDTO {
         UserPublicDTO userPublicDTO = new UserPublicDTO();
         userPublicDTO.setFirstName(user.getFirstName());
         userPublicDTO.setLastName(user.getLastName());
-        userPublicDTO.setEmail(user.getEmail());
         userPublicDTO.setAboutMe(user.getAboutMe());
         userPublicDTO.setImageUrl(user.getImageUrl());
         return userPublicDTO;

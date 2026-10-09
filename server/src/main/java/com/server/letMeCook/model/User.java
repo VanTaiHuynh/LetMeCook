@@ -4,6 +4,8 @@ package com.server.letMeCook.model;
 import java.util.UUID;
 
 import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,6 +16,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
+@org.hibernate.annotations.BatchSize(size=50)
 @Table(name = "users")
 @Getter
 @Setter
@@ -47,8 +50,9 @@ public class User {
     @Column(name = "cooking_skill")
     private String cookingLvl = "";
 
-    @Column(name = "dietary_pref")
-    private String dietaryPref= "";
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "dietary_pref", columnDefinition = "text[]")
+    private String[] dietaryPref = new String[0];
 
 
     public User() {    }

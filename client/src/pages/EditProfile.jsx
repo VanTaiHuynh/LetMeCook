@@ -1,11 +1,15 @@
+import useIngredientLookup from "../utils/useIngredientLookup";
+import { saveOwnProfile, setOwnProfileImage } from "../utils/accountMutations";
+import Alert from "../components/ui/Alert";
+import { ownProfile } from "../utils/accountApi";
+import Button from "../components/ui/Button";
+import Field from "../components/ui/Field";
 import React, { useEffect, useState, useRef } from 'react';
-import { useAuth } from '../context/AuthProvider';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import Select from 'react-select';
-import { useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import Modal from '../components/Modal';
-import '../EditProfile.css';
-import { debounce, set } from 'lodash';
 
 const DIETARY_OPTIONS = [
   'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Nut-Free',
@@ -14,8 +18,7 @@ const DIETARY_OPTIONS = [
 
 const COOKING_SKILL = ['beginner', 'home cook', 'skilled', 'chef', 'master chef'];
 
-export default function EditProfile() {
-  const { user, loading } = useAuth();
+function EditProfileForm({ user }) {
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({
     full_name: '',
@@ -28,71 +31,37 @@ export default function EditProfile() {
   });
   const [error, setError] = useState(null);
   const [ingredientSearch, setIngredientSearch] = useState('');
-  const [ingredientsResults, setIngredientsResults] = useState([]);
+  const { items: ingredientsResults, error: ingredientError, loading: ingredientSearching } = useIngredientLookup(ingredientSearch);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [loadVersion, setLoadVersion] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const busyRef = useRef(false);
+  const activeRef = useRef(true);
+  const pendingRef = useRef(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+  useEffect(() => { activeRef.current = true; return () => { activeRef.current = false; pendingRef.current?.abort(); }; }, []);
 
   useEffect(() => {
-    if (!user && !loading) {
-      navigate('/unauthorized');
-      return;
-    }
-
+    const controller = new AbortController();
+    let active = true;
+    setProfileLoading(true);
+    setError(null);
     (async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (data) {
-        let allergiesArr = [];
-
-
-        if (data.user_allergy?.length > 0) {
-          const { data: allergyData } = await supabase
-            .from('ingredients')
-            .select('id, name')
-            .in('id', data.user_allergy);
-
-          allergiesArr = (allergyData || []).map(a => ({
-            id: a.id,
-            name: a.name
-          }));
-        }
-
-        setForm({ ...data, user_allergy: allergiesArr, dietary_pref: data.dietary_pref || [] });
-        setProfile(data);
-      } else {
-        setError(error?.message || "No profile found");
+      try {
+      const data = await ownProfile({ signal: controller.signal, actorId: user.id });
+      if (!Array.isArray(data.allergyIngredients)) throw new Error('Your allergy choices could not be loaded. Retry before editing.');
+      if (active) { setForm({ ...data, user_allergy: data.allergyIngredients }); setProfile(data); }
+      } catch (error) {
+        if (active) setError(error.message || 'Could not load your profile. Please try again.');
+      } finally {
+        if (active) setProfileLoading(false);
       }
     })();
-  }, [user, loading, navigate]);
-
-  const debouncedSearch = useRef(debounce(async (input) => {
-    if (!input) return;
-    const { data, error } = await supabase
-      .from('ingredients')
-      .select('*')
-      .ilike('name', `%${input}%`)
-      .limit(10);
-
-    if (!error) {
-      setIngredientsResults(data.map(ingredient => ({
-        id: ingredient.id,
-        name: ingredient.name,
-        ...ingredient
-      })));
-    } else {
-      console.error("Ingredient search error:", error.message);
-    }
-  }, 300)).current;
-
-  useEffect(() => {
-    debouncedSearch(ingredientSearch);
-  }, [ingredientSearch]);
+    return () => { active = false; controller.abort(); };
+  }, [user.id, loadVersion]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -108,42 +77,39 @@ export default function EditProfile() {
   };
 
   const handleAllergies = (selected) => {
-    setForm({ ...form, user_allergy: selected.map(s => ({ id: s.value, name: s.label })) });
+    setForm({ ...form, user_allergy: (selected || []).map(s => ({ id: s.value, name: s.label })) });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const { data, error } = await supabase
-      .from("users")
-      .update({
-        first_name: form.first_name,
-        last_name: form.last_name,
-        dietary_pref: form.dietary_pref || [],
-        cooking_skill: form.cooking_skill,
-        about_me: form.about_me,
-        user_allergy: (form.user_allergy || []).map(a => a.id),
-      })
-      .eq("id", user.id)
-      .select();
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
+    if (busyRef.current || !activeRef.current || !user?.id || !profile) return;
+    busyRef.current = true;
+    const controller = new AbortController(); pendingRef.current = controller;
+    setSaving(true);
     setError(null);
+    try {
+    await saveOwnProfile(user.id,form,controller.signal);
+    if (!activeRef.current || controller.signal.aborted) return;
     setProfile({ ...profile, ...form });
     setShowModal(true);
+    } catch (error) {
+      if (activeRef.current && !controller.signal.aborted) setError(error.message || 'Could not save your profile. Please try again.');
+    } finally {
+      pendingRef.current = null; busyRef.current = false;
+      if (activeRef.current) setSaving(false);
+    }
   };
 
   const handleImgUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
+    if (!file || busyRef.current || !activeRef.current || !user?.id || !profile) return;
+    busyRef.current = true;
+    const controller = new AbortController(); pendingRef.current = controller;
     setUploading(true);
+    setError(null);
+    try {
     const fileExt = file.name.split('.').pop();
-    const filepath = `${user.id}_${Date.now()}.${fileExt}`;
+    const filepath = `${user.id}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('user-profile-images')
@@ -152,90 +118,96 @@ export default function EditProfile() {
         upsert: true
       });
 
-    if (error) {
-      setUploading(false);
-      setError(error.message);
-      return;
-    }
+    if (error) throw error;
+    if (!activeRef.current || controller.signal.aborted) return;
 
     const { data: publicURLData } = supabase.storage
       .from('user-profile-images')
       .getPublicUrl(filepath);
 
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ image_url: publicURLData.publicUrl })
-      .eq('id', user.id);
-
-    if (updateError) {
-      setUploading(false);
-      setError(updateError.message);
-      return;
+    await setOwnProfileImage(user.id,publicURLData.publicUrl,controller.signal);
+    if (!activeRef.current || controller.signal.aborted) return;
+    setForm((previous) => ({ ...previous, image_url: publicURLData.publicUrl }));
+    } catch (error) {
+      if (activeRef.current && !controller.signal.aborted) setError(error.message || 'Could not upload your photo. Please try again.');
+    } finally {
+      pendingRef.current = null; busyRef.current = false;
+      if (activeRef.current) setUploading(false);
     }
-
-    setForm({ ...form, image_url: publicURLData.publicUrl });
-    setUploading(false);
   };
 
+  if (profileLoading) return <main className="product-page product-edit-profile-page edit-profile-container"><h1 className="product-page-title">Edit profile</h1><p role="status">Loading your profile…</p></main>;
+  if (!profile) return <main className="product-page product-edit-profile-page edit-profile-container"><h1 className="product-page-title">Edit profile</h1><Alert as="p" className="error-message">{error || 'Your profile is unavailable.'}</Alert><Button type="button" className="product-edit-toggle" onClick={() => setLoadVersion((version) => version + 1)}>Try again</Button></main>;
+
   return (
-    <div className="edit-profile-container">
-      <h1>Edit Profile</h1>
-      <form onSubmit={handleSubmit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-          }
-        }}
-      >
+    <main className="product-page product-edit-profile-page edit-profile-container">
+      <header className="account-page-header lmc-page-header"><div><h1 className="product-page-title">Edit profile</h1></div><Link to="/profile" className="lmc-button lmc-button--quiet">View profile</Link></header>
+      <form onSubmit={handleSubmit} aria-busy={saving || uploading}>
+        <div className="profile-panels">
+        <fieldset className="profile-form-section" disabled={saving || uploading}><legend>Personal details</legend>
         {form.image_url && (
-          <img src={form.image_url} alt="Profile" />
+          <img src={form.image_url} alt="Your profile preview" className="profile-preview" />
         )}
+        <div className="profile-form-field"><Field htmlFor="profile-photo">Profile photo</Field>
         <input
+          id="profile-photo"
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/gif"
           ref={fileInputRef}
           onChange={handleImgUpload}
-          disabled={uploading}
-        />
-        {uploading && <span>Uploading...</span>}
+          disabled={uploading || saving}
+        /></div>
+        {uploading && <p role="status">Uploading your photo…</p>}
 
+        <div className="profile-form-fields"><div className="profile-form-field"><Field htmlFor="profile-first_name">First name</Field>
         <input
+          id="profile-first_name"
+          autoComplete="given-name"
+          disabled={uploading || saving}
           type="text"
           name="first_name"
           value={form.first_name || ''}
           onChange={handleChange}
           placeholder="First Name"
-        />
+        /></div>
+        <div className="profile-form-field"><Field htmlFor="profile-last_name">Last name</Field>
         <input
+          id="profile-last_name"
+          autoComplete="family-name"
+          disabled={uploading || saving}
           type="text"
           name="last_name"
           value={form.last_name || ''}
           onChange={handleChange}
           placeholder="Last Name"
-        />
+        /></div></div>
+        <div className="profile-form-field"><Field htmlFor="profile-about">About me</Field>
         <textarea
+          id="profile-about"
           name="about_me"
+          disabled={uploading || saving}
           value={form.about_me || ''}
           onChange={handleChange}
           placeholder="About Me"
-        />
+        /></div>
 
-        <label>Dietary Preferences</label>
-        <Select
+        </fieldset><fieldset className="profile-form-section" disabled={saving || uploading}><legend>Cooking preferences</legend><div className="profile-form-field"><Field htmlFor="profile-dietary">Dietary preferences</Field>
+        <Select inputId="profile-dietary" classNamePrefix="product-select"
           name="dietary_pref"
-          value={DIETARY_OPTIONS.filter(opt =>
-            (form.dietary_pref || []).includes(opt.value)
-          )}
+          value={(form.dietary_pref || []).map(value => ({ label: value, value }))}
+          isDisabled={uploading || saving}
           onChange={handleDietaryPreference}
           isMulti
           closeMenuOnSelect={false}
           options={DIETARY_OPTIONS}
           placeholder="Select Dietary Preferences"
-        />
+        /></div>
 
-        <label>Cooking Skill Level</label>
+        <div className="profile-form-field"><Field htmlFor="profile-skill">Cooking skill level</Field>
         <select
+          id="profile-skill"
           name="cooking_skill"
+          disabled={uploading || saving}
           value={form.cooking_skill}
           onChange={handleCookingLvl}
         >
@@ -245,11 +217,13 @@ export default function EditProfile() {
               {skill}
             </option>
           ))}
-        </select>
+        </select></div>
 
-        <label>Allergies</label>
-        <Select
+        <div className="profile-form-field"><Field htmlFor="profile-allergies">Ingredients to avoid</Field>
+        <Select inputId="profile-allergies" classNamePrefix="product-select"
           name="allergies"
+          isDisabled={uploading || saving}
+          isLoading={ingredientSearching}
           value={(Array.isArray(form.user_allergy) ? form.user_allergy : [])
             .filter(a => a && a.id && a.name)
             .map(a => ({
@@ -264,9 +238,9 @@ export default function EditProfile() {
           }}
           isMulti
           closeMenuOnSelect={false}
-          placeholder="Search for allergies..."
+          placeholder="Search for ingredients to avoid"
           noOptionsMessage={() =>
-            ingredientSearch ? "No allergies found" : "Type to search for allergies"
+            ingredientError || (ingredientSearch ? 'No matching ingredients' : 'Type to search for an ingredient')
           }
           options={ingredientsResults.map(ingredient => ({
             value: ingredient.id,
@@ -274,13 +248,15 @@ export default function EditProfile() {
           }))}
           menuPortalTarget={document.body}
           styles={{
-            menuPortal: base => ({ ...base, zIndex: 9999 }),
+            menuPortal: base => ({ ...base, zIndex: 80 }),
           }}
-        />
+        /></div>
+        {ingredientError && <Alert as="p" className="error-message">{ingredientError}</Alert>}
+        </fieldset>
+        </div>
+        {error && <Alert as="p" className="error-message">{error}</Alert>}
 
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-
-        <button type="submit">Update Profile</button>
+        <div className="account-form-actions"><Button type="submit" className="lmc-button lmc-button--primary" disabled={saving || uploading}>{saving ? 'Saving…' : 'Save profile'}</Button><Link to="/profile" className="lmc-button lmc-button--secondary">Cancel</Link></div>
       </form>
 
       <Modal
@@ -291,6 +267,13 @@ export default function EditProfile() {
           navigate("/profile");
         }}
       />
-    </div>
+    </main>
   );
+}
+
+export default function EditProfile() {
+  const { user, loading } = useAuth();
+  if (loading) return <main className="product-page layout-wrapper"><h1 className="product-page-title">Edit profile</h1><p role="status">Checking your account…</p></main>;
+  if (!user) return <Navigate to="/login" state={{ from: { pathname: '/edit-profile' } }} replace/>;
+  return <EditProfileForm key={user.id} user={user}/>;
 }

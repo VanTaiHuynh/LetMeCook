@@ -1,153 +1,51 @@
-import React, { useEffect, useState } from "react";
 import "./RecipeDetailCard.css";
-import { supabase } from "../utils/supabaseClient";
-import { useAuth } from "../context/AuthProvider";
-import { useNavigate, Link } from "react-router-dom";
+import { ingredientQuantity, recipeSteps } from "../utils/recipeContent";
 
-export default function RecipeDetailCard({ recipe }) {
-  const { user } = useAuth();
-  const [authorId, setAuthorId] = useState("");
-  const [isSaved, setIsSaved] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    setIsSaved(false); // Reset before checking
-    const fetchRecipe = async () => {
-      const { data, error } = await supabase
-        .from("recipe")
-        .select("author_id")
-        .eq("id", recipe.id)
-        .single();
-
-      if (!error && data) {
-        setAuthorId(data.author_id);
-      }
-    };
-
-    const checkIfSaved = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from("recipe_favourites")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("recipe_id", recipe.id)
-        .single();
-
-      if (data) setIsSaved(true);
-    };
-
-    if (recipe?.id) {
-      fetchRecipe();
-      checkIfSaved();
-    }
-  }, [recipe.id, user]);
-
+export default function RecipeDetailCard({ recipe, showOverviewHeading = true }) {
   const capitalizeWords = (text) =>
     text.replace(/\b\w/g, (char) => char.toUpperCase());
 
-  const handleSave = async () => {
-    if (isSaved || !user) return;
-
-    const { error } = await supabase.from("recipe_favourites").insert({
-      recipe_id: recipe.id,
-      user_id: user.id,
-    });
-
-    if (!error) {
-      setIsSaved(true);
-    } else {
-      console.log("Error saving to favourites:", error.message);
-    }
-  };
-
-  const handlePrint = () => window.print();
-
   return (
-    <div className="recipe-detail-card-container">
+    <div className="recipe-detail-card-container" id="recipe-method">
       <div className="recipe-detail-card">
         <div className="recipe-detail-info-column">
-          <h1 className="recipe-detail-title">{recipe.title}</h1>
+          <h1 className="recipe-print-title">{recipe.title}</h1>
+          {showOverviewHeading && <h2 className="recipe-detail-title">At a glance</h2>}
 
-          <div className="recipe-detail-meta">
-            <p>
-              By <strong>{recipe.authorName}</strong>
-            </p>
-            <p>
-              Yield: {recipe.servings} servings • ⏱ {recipe.cookingTime} minutes
-            </p>
-            <p>
-              <strong>Category:</strong>{" "}
-              {recipe.categories?.map(capitalizeWords).join(", ") || "N/A"}
-            </p>
-            <p>
-              <strong>Dietary:</strong>{" "}
-              {recipe.dietaryPreferences?.map(capitalizeWords).join(", ") ||
-                "N/A"}
-            </p>
-            <p>
-              <strong>Cuisine:</strong>{" "}
-              {recipe.cuisines?.map(capitalizeWords).join(", ") || "N/A"}
-            </p>
-          </div>
+          <dl className="recipe-detail-meta">
+            <div><dt>Servings</dt><dd>{recipe.servings > 0 ? recipe.servings : "Not specified"}</dd></div>
+            <div><dt>Cooking time</dt><dd>{recipe.cookingTime > 0 ? `${recipe.cookingTime} minutes` : "Not specified"}</dd></div>
+            <div><dt>Diet labels</dt><dd>{recipe.dietaryPreferences?.map(capitalizeWords).join(", ") || "Not specified"}</dd></div>
+          </dl>
 
-          <div className="recipe-detail-actions">
-            <button className="print-btn" onClick={handlePrint}>
-              Print Recipe
-            </button>
-
-            {user?.id === authorId && (
-              <button
-                className="edit-recipe-btn"
-                onClick={() => navigate(`/edit-recipe/${recipe.id}`)}
-              >
-                Edit
-              </button>
-            )}
-
-            {isSaved ? (
-              <Link to="/favourites" className="save-btn saved">
-                Saved to Favourites
-              </Link>
-            ) : (
-              <button
-                className={`save-btn ${!user ? "disabled-btn" : ""}`}
-                onClick={handleSave}
-                disabled={!user}
-                title={
-                  !user ? "Log in to save this recipe" : "Save this recipe"
-                }
-              >
-                Save
-              </button>
-            )}
-          </div>
+          <details className="recipe-detail-extra">
+            <summary>Category and cuisine</summary>
+            <dl className="recipe-detail-meta">
+              <div><dt>Category</dt><dd>{recipe.categories?.map(capitalizeWords).join(", ") || "Not specified"}</dd></div>
+              <div><dt>Cuisine</dt><dd>{recipe.cuisines?.map(capitalizeWords).join(", ") || "Not specified"}</dd></div>
+            </dl>
+          </details>
         </div>
 
-        <div className="recipe-detail-image-column">
-          <img
-            src={recipe.imageUrl}
-            alt={recipe.title}
-            className="recipe-detail-image"
-          />
-          {/* <p className="recipe-detail-rating">★★★★★ ({recipe.rating || 0})</p> */}
-        </div>
       </div>
 
       <div className="recipe-detail-body">
+        <section className="recipe-ingredients-section">
         <h2>Ingredients</h2>
         <ul className="ingredient-list">
           {recipe.ingredients.map((item, index) => (
             <li key={index}>
-              {item.quantity} {item.unit} {item.ingredientName}
+              {ingredientQuantity(item.quantity) ? `${ingredientQuantity(item.quantity)} ` : ""}{item.unit ? `${item.unit} ` : ""}{item.ingredientName}
             </li>
           ))}
         </ul>
-
+        </section>
+        <section className="recipe-instructions-section">
         <h2>Instructions</h2>
-        <ol
-          className="instruction-list"
-          dangerouslySetInnerHTML={{ __html: recipe.directions }}
-        />
+        <ol className="instruction-list">
+          {recipeSteps(recipe.directions).map((step, index) => <li key={index}>{step}</li>)}
+        </ol>
+        </section>
       </div>
     </div>
   );

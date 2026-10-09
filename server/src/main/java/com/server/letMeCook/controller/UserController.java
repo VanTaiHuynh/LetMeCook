@@ -30,8 +30,7 @@ public class UserController {
     }
 
     @GetMapping("/users/{id}")
-    public UserPublicDTO getUserById(@PathVariable String id) {
-        UUID uuid = UUID.fromString(id);
-        return userService.getUserById(uuid);
+    public UserPublicDTO getUserById(@PathVariable UUID id) {
+        return userService.getUserById(id);
     }
 }

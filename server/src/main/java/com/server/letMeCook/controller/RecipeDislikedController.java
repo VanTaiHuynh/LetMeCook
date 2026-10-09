@@ -4,6 +4,9 @@ import com.server.letMeCook.service.RecipeDislikedService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import com.server.letMeCook.security.RequestIdentity;
 
 import java.util.UUID;
 
@@ -17,9 +20,10 @@ public class RecipeDislikedController {
     @PostMapping
     public ResponseEntity<String> dislikeRecipe(
             @RequestParam UUID userId,
-            @RequestParam UUID recipeId
+            @RequestParam UUID recipeId,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        service.addDislike(userId, recipeId);
+        service.addDislike(RequestIdentity.requireOwner(jwt, userId), recipeId);
         return ResponseEntity.ok("Disliked successfully.");
     }
 }

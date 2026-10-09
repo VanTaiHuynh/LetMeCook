@@ -1,0 +1,6 @@
+.information-page.information-newsletter .newsletter-consent { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; margin: 0; color: var(--lmc-muted); font-size: .875rem; line-height: 1.65; cursor: pointer; }
+.information-page.information-newsletter .newsletter-consent input { width: 22px; height: 22px; min-height: 22px; flex: 0 0 22px; padding: 0; margin: 1px 0 0; accent-color: var(--lmc-ink); }
+.information-page.information-newsletter .newsletter-form .newsletter-another { align-self: flex-start; }
+.information-page.information-newsletter .newsletter-action-layout { max-width: 65ch; }
+.information-page.information-newsletter .newsletter-link-error { max-width: 65ch; margin: 0; }
+.information-page.information-newsletter .newsletter-link-error > p { margin-top: 0; margin-bottom: 24px; font-size: 1rem; line-height: 1.7; }

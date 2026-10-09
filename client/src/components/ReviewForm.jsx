@@ -1,99 +1,72 @@
-import { useState } from "react";
-import { supabase } from "../utils/supabaseClient";
+import Alert from "../components/ui/Alert";
+import Button from "../components/ui/Button";
+import Field from "../components/ui/Field";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { httpClient } from "../utils/httpClient";
 import "./ReviewForm.css";
 
-const ReviewForm = ({ recipeId, onReviewSubmitted }) => {
+const ReviewEditor = ({ recipeId, onReviewSubmitted, autoFocus }) => {
   const [comment, setComment] = useState("");
-  const [ratings, setRatings] = useState({
-    cost: 0,
-    time: 0,
-    difficulty: 0,
-    overall: 0,
-  });
+  const [ratings, setRatings] = useState({ cost: '', time: '', difficulty: '', overall: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const pending = useRef(null);
+  const active = useRef(true);
+
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; pending.current?.abort(); };
+  }, []);
 
   const handleRatingChange = (category, value) => {
-    setRatings({ ...ratings, [category]: parseInt(value, 10) });
+    setRatings(previous => ({ ...previous, [category]: parseInt(value, 10) }));
   };
 
-  // When user clicks on submit review button
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
-
-    // get user session information
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error | !user) {
-      console.error("User not authenticated:", error.message);
-      setSubmitting(false);
-      return;
+    if (pending.current || !active.current) return;
+    const controller = new AbortController();
+    pending.current = controller; setErrorMessage(''); setSubmitting(true);
+    try {
+      await httpClient.json('/reviews', { auth: 'required', method: 'POST', body: { recipeId, comment, ratings }, signal: controller.signal, service: 'Your review' });
+      if (controller.signal.aborted || !active.current || pending.current !== controller) return;
+      setComment(''); setRatings({cost:'',time:'',difficulty:'',overall:''}); onReviewSubmitted?.();
+    } catch (error) {
+      if (!controller.signal.aborted && active.current && pending.current === controller) setErrorMessage(error.message || 'Your review could not be saved. Please try again.');
+    } finally {
+      if (pending.current === controller) { pending.current = null; if (active.current) setSubmitting(false); }
     }
 
-    // Insert new review into reviews table
-    const { data: reviewData, error: reviewError } = await supabase
-      .from("reviews")
-      .insert({
-        recipe_id: recipeId,
-        user_id: user.id,
-        comment,
-      })
-      .select()
-      .single();
-
-    if (reviewError) {
-      console.error("Error adding review:", reviewError.message);
-      setSubmitting(false);
-      return;
-    }
-
-    const reviewId = reviewData.id;
-
-    // Insert ratings for each category
-    const ratingRows = Object.entries(ratings).map(([category, value]) => ({
-      review_id: reviewId,
-      category,
-      value,
-    }));
-
-    // fetch review_ratings table and insert rows
-    const { error: ratingsError } = await supabase
-      .from("review_ratings")
-      .insert(ratingRows);
-
-    if (ratingsError) {
-      console.error("Error adding ratings:", ratingsError.message);
-    } else {
-      setComment("");
-      setRatings({ cost: 0, time: 0, difficulty: 0 });
-      onReviewSubmitted?.();
-    }
-
-    setSubmitting(false);
   };
 
   return (
-    <div className="review-form" style={{ marginTop: "1.5rem" }}>
-      <form onSubmit={handleSubmit}>
-        <h3>Leave a Review</h3>
+    <div className="review-form">
+      <form onSubmit={handleSubmit} aria-busy={submitting}>
+        <h3>Your cooking notes</h3>
+        <Field htmlFor="recipe-review-comment">Your review</Field>
         <textarea
-          placeholder="Your comment"
+          id="recipe-review-comment"
+          placeholder="How did the recipe turn out?"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          rows={10}
-          cols={50}
+          rows={4}
+          autoFocus={autoFocus}
+          maxLength={3000}
+          disabled={submitting}
           required
         />
         <div className="review-ratings-group">
           {["cost", "time", "difficulty", "overall"].map((cat) => (
             <div className="rating-field" key={cat}>
-              <label className="rating-label">
-                {cat.charAt(0).toUpperCase() + cat.slice(1)}:
-              </label>
+              <Field className="rating-label" htmlFor={`recipe-rating-${cat}`}>
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </Field>
               <select
+                id={`recipe-rating-${cat}`}
                 className="rating-select"
+                disabled={submitting}
                 value={ratings[cat]}
                 onChange={(e) => handleRatingChange(cat, e.target.value)}
                 required
@@ -101,26 +74,24 @@ const ReviewForm = ({ recipeId, onReviewSubmitted }) => {
                 <option value="">Select rating</option>
                 {[1, 2, 3, 4, 5].map((val) => (
                   <option key={val} value={val}>
-                    {val}
+                    {val} / 5
                   </option>
                 ))}
               </select>
             </div>
           ))}
 
-          <div className="rating-field submit-wrapper">
-            <button
-              type="submit"
-              className="submit-button"
-              disabled={submitting}
-            >
-              {submitting ? "Submitting..." : "Submit Review"}
-            </button>
-          </div>
         </div>
+        {errorMessage && <Alert as="p" className="error-message">{errorMessage}</Alert>}
+        <div className="review-form-actions"><Button type="submit" className="lmc-button lmc-button--primary" disabled={submitting}>{submitting ? "Saving review…" : "Save review"}</Button></div>
       </form>
     </div>
   );
 };
 
-export default ReviewForm;
+export default function ReviewForm({ recipeId, onReviewSubmitted, autoFocus = false }) {
+  const { user, loading } = useAuth();
+  if (loading) return <p role="status">Checking your account…</p>;
+  if (!user) return <p><Link to="/login" state={{from:{pathname:`/recipes/${recipeId}`,hash:'#recipe-reviews'}}} className="lmc-button lmc-button--primary">Sign in to review</Link></p>;
+  return <ReviewEditor key={`${user.id}:${recipeId}`} recipeId={recipeId} onReviewSubmitted={onReviewSubmitted} autoFocus={autoFocus}/>;
+}

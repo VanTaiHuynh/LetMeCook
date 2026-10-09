@@ -1,10 +1,10 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 
 export default function TransitionOverlay({ isVisible }) {
   return (
     <AnimatePresence>
       {isVisible && (
-        <motion.div
+        <Motion.div
           className="transition-overlay"
           initial={{ y: "100%" }}
           animate={{ y: 0 }}

@@ -1,58 +1,45 @@
-// src/pages/About.jsx
+import { Link } from 'react-router-dom';
+import { InformationHero } from '../components/InformationPages';
+import { sunnyChef as sunny } from "../utils/siteAsset";
+import './About.css';
 
-import React from "react";
-import "../styles.css";   // global site styles
-import "../about.css";    // About-page-specific styles
-
-const About = () => {
-  return (
-    <>
-      {/* Main Content */}
-      <main>
-        <section className="layout-wrapper about-container">
-          <h2>About Us</h2>
-          <p>
-            Welcome to <strong>Let Me Cook</strong>, your trusted kitchen companion and recipe resource.
-            Founded by a passionate team of culinary enthusiasts, we are dedicated to making cooking
-            accessible, enjoyable, and rewarding for everyone — from beginners to seasoned home chefs.
-          </p>
-          <p>
-            Our mission is simple: to inspire confidence in the kitchen through clear, approachable
-            recipes, innovative ideas, and helpful tips. Whether you want to prepare a quick weekday
-            meal or impress guests with gourmet dishes, our curated recipes are designed to fit your
-            lifestyle and taste.
-          </p>
-
-          <h3>Data and Technology</h3>
-          <p>
-            At Let Me Cook, we harness modern technology responsibly to enhance your experience.
-            We collect minimal user data strictly for improving our services, personalizing content,
-            and ensuring site functionality.
-          </p>
-          <p>
-            Our recipe database is compiled from trusted culinary sources, licensed content, and
-            original creations by our in-house chefs. Additionally, some of our recommendations
-            are generated with the assistance of AI to provide personalized suggestions.
-          </p>
-
-          <h3>Ethical Commitment</h3>
-          <p>
-            We uphold a strong commitment to copyright and intellectual property rights.
-            All content on this site is either owned by Let Me Cook, used under license,
-            or sourced with permission.
-          </p>
-          <p>
-            Thank you for being part of our community. We look forward to cooking alongside you
-            and making every meal a memorable experience.
-          </p>
-
-          <div className="back-to-top">
-        <a href="#">↑ Back to Top</a>
-      </div>
-        </section>
-      </main>
-    </>
-  );
-};
-
-export default About;
+export default function About() {
+  return <main className="product-page information-page information-about">
+    <div className="layout-wrapper information-shell">
+      <InformationHero title="About LetMeCook" id="about-top" intro="A little less dinner stress. A little more joy in the kitchen." aside={<img src={sunny} className="information-mascot" alt="Sunny, the LetMeCook cooking assistant" />}>
+        <div className="information-actions"><Link to="/features" className="lmc-button lmc-button--primary">Explore the features</Link><Link to="/how-it-works" className="lmc-button lmc-button--secondary">See how it works</Link></div>
+      </InformationHero>
+      <section className="information-panel information-about-content about-purpose" aria-labelledby="about-purpose">
+        <h2 id="about-purpose">Dinner should fit your life.</h2>
+        <p>Some nights you want to try something new. Others, you just want a good meal
+          with what is already in the fridge. LetMeCook starts with both: less time
+          deciding, more room to enjoy making something.</p>
+        <p>The experience we’re shaping brings recipes, planning and AI cooking support
+          together around the way you eat, shop and cook.</p>
+        <div className="about-story">
+          <section aria-labelledby="about-inspiration">
+            <h3 id="about-inspiration">Start with what you have</h3>
+            <p>Ingredients on hand, a favorite flavor or a craving can be the starting
+              point. Sunny is our friendly AI cooking companion, with a vision for
+              turning ingredient photos and everyday questions into ideas that suit your taste.</p>
+          </section>
+          <section aria-labelledby="about-week">
+            <h3 id="about-week">Make the week feel lighter</h3>
+            <p>A few dinner ideas become a weekly plan, and a plan gives the grocery
+              list a purpose. Shared household planning is part of that picture:
+              a place for everyone’s preferences and a clearer sense of what to buy.</p>
+          </section>
+          <section aria-labelledby="about-cooking">
+            <h3 id="about-cooking">Enjoy the cooking part</h3>
+            <p>Clear steps, useful timers and voice guidance are at the heart of a
+              calmer cooking experience. The goal is to keep the next step close,
+              so you can focus on the food in front of you.</p>
+          </section>
+        </div>
+      </section>
+      <footer className="about-notes">
+        <Link to="/privacy" className="about-privacy">Read the privacy policy</Link>
+      </footer>
+    </div>
+  </main>;
+}

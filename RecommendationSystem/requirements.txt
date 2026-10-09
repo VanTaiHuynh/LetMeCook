@@ -1,10 +1,16 @@
-pandas
-sqlalchemy
-pg8000
-beautifulsoup4
-scikit-learn
-flask
-dotenv
-torch
-sentence_transformers
-supabase
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0+cpu
+sentence-transformers==3.4.1
+transformers>=4.41,<4.50
+pandas>=2.2,<3
+sqlalchemy>=2.0,<3
+pg8000>=1.31,<2
+beautifulsoup4>=4.12,<5
+scikit-learn>=1.5,<2
+flask>=3.0,<4
+python-dotenv>=1.0,<2
+gunicorn>=23,<24
+Pillow>=11,<12
+faster-whisper==1.2.1
+piper-tts==1.8.0
+pathvalidate==3.3.1

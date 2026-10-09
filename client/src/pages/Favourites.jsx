@@ -1,190 +1,109 @@
+import { paginationPages } from "../utils/pagination";
+import Alert from "../components/ui/Alert";
+import { accountRecipes } from "../utils/accountApi";
+import Button from "../components/ui/Button";
 import { useEffect, useRef, useState } from "react";
 import RecipeList from "./../components/RecipeList";
-import { supabase } from "../utils/supabaseClient";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useAuth } from "../context/AuthProvider";
+import { favoriteMutation } from "../utils/accountMutations";
+import { useAuth } from "../context/AuthContext";
 import { FaEdit } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
-gsap.registerPlugin(ScrollTrigger);
 
 const RESULTS_PER_PAGE = 24;
-const SORT_OPTIONS = {
-  createdAt: "Most Recent",
-  viewCount: "Most Popular",
-  cookTime: "Cooking Time",
-};
-
-export default function Favourites() {
-  const [loading, setLoading] = useState(false);
+function FavouritesContent({ user }) {
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
-  const sectionRef = useRef(null);
-  const { user, loading: userLoading } = useAuth();
   const [favRecipes, setFavRecipes] = useState([]);
   const [editMode, setEditMode] = useState(false);
+  const [error, setError] = useState('');
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const visibleRecipes = favRecipes;
 
-  const navigate = useNavigate();
 
   const editBtnRef = useRef(null);
+  const activeRef = useRef(true);
+  const pendingRef = useRef(new Map());
+  useEffect(() => { const requests = pendingRef.current; activeRef.current = true; return () => { activeRef.current = false; requests.forEach(controller => controller.abort()); requests.clear(); }; }, []);
 
-  const handleReorder = (newOrder) => {
-    setFavRecipes(newOrder);
-  };
+  useEffect(() => { setPage((current) => Math.min(current, totalPages)); }, [totalPages]);
 
-  useEffect(() => {
-    if (!user && !userLoading) {
-      navigate("/unauthorized");
-      return;
-    }
-  }, [user, navigate, userLoading]);
+
 
   const handleRemove = async (recipeId) => {
-    if (!user?.id) return;
+    if (!user?.id || !activeRef.current || pendingRef.current.has(recipeId)) return;
+    const controller = new AbortController(); pendingRef.current.set(recipeId, controller);
 
-    console.log("Deleting favourite:", {
-      userId: user.id,
-      recipeId: recipeId,
-      typeofUserId: typeof user.id,
-      typeofRecipeId: typeof recipeId,
-    });
-
-    const { data, error } = await supabase
-      .from("recipe_favourites")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("recipe_id", recipeId);
-
-    console.log("Delete result:", { data, error });
-
-    if (error) {
-      console.error("Failed to remove favourite:", error.message);
-      return;
-    }
-
-    // Update UI
-    const updatedList = favRecipes.filter((r) => r.id !== recipeId);
-    setFavRecipes(updatedList);
-    setTotalElements(updatedList.length);
-    setTotalPages(Math.ceil(updatedList.length / RESULTS_PER_PAGE));
+    setError('');
+    try {
+    await favoriteMutation(recipeId,user.id,{remove:true,signal:controller.signal});
+    if (!activeRef.current || controller.signal.aborted) return;
+    if (favRecipes.length === 1 && page > 1) setPage(value => value - 1);
+    else setRefreshVersion(value => value + 1);
+    } catch (error) {
+      if (activeRef.current && !controller.signal.aborted) setError(error.message || 'Could not remove this favorite. Please try again.');
+    } finally { if (pendingRef.current.get(recipeId) === controller) pendingRef.current.delete(recipeId); }
   };
 
   useEffect(() => {
-    if (userLoading) return;
-    if (!user?.id) {
-      console.log("user doesn't exist");
-      return;
-    }
+    if (!user?.id) return;
+    const controller = new AbortController();
+    let active = true;
 
     async function fetchFav() {
-      console.log("fetching user: ", user.id);
       setLoading(true);
+      setError('');
+      try {
 
-      const { data: favData, error: favError } = await supabase
-        .from("recipe_favourites")
-        .select("recipe_id")
-        .eq("user_id", user.id);
-
-      if (favError) {
-        console.log("Error fetching favourites:", favError);
-        setLoading(false);
-        return;
+      const data = await accountRecipes('favorites', page - 1, { signal: controller.signal, actorId: user.id });
+      if (!active || controller.signal.aborted) return;
+      setFavRecipes(data.content); setTotalElements(data.totalElements); setTotalPages(Math.max(1, data.totalPages));
+      } catch (error) {
+        if (active) {
+          setError(error.message || 'Could not load your favorites. Please try again.');
+          setFavRecipes([]);
+        }
+      } finally {
+        if (active) setLoading(false);
       }
-
-      const favRecipeIds = favData.map((item) => item.recipe_id);
-
-      if (!favRecipeIds || favRecipeIds.length === 0) {
-        console.log("No favourites found.");
-        setFavRecipes([]);
-        setTotalElements(0);
-        setTotalPages(1);
-        setLoading(false);
-        return;
-      }
-
-      const { data: recipeData, error: recipeErr } = await supabase
-        .from("recipe")
-        .select("*")
-        .in("id", favRecipeIds);
-
-      if (recipeErr) {
-        console.log("Error fetching recipes: ", recipeErr);
-      } else {
-        const sorted = recipeData.sort(
-          (a, b) => favRecipeIds.indexOf(a.id) - favRecipeIds.indexOf(b.id)
-        );
-        setFavRecipes(
-          sorted.map((r) => ({
-            ...r,
-            cookingTime: r.time,
-          }))
-        );
-        setTotalElements(sorted.length);
-        setTotalPages(Math.ceil(sorted.length / RESULTS_PER_PAGE));
-      }
-
-      setLoading(false);
     }
 
     fetchFav();
-  }, [user, userLoading]);
+    return () => { active = false; controller.abort(); };
+  }, [user.id, page, refreshVersion]);
 
-  useEffect(() => {
-    const el = sectionRef.current;
-
-    if (el) {
-      gsap.fromTo(
-        el,
-        { opacity: 1, y: 100 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: el,
-            start: "top 100%", // triggers earlier
-            toggleActions: "play none none none",
-          },
-        }
-      );
-    }
-  }, []);
 
   return (
-    <section className="all-recipes-section" ref={sectionRef}>
+    <main className="product-page product-favourites-page all-recipes-section">
       <div className="all-recipes-bg" />
       <div className="layout-wrapper">
-        <div className="favourites-header">
-          <h3>My Favourites</h3>
-          <FaEdit
-            size={24}
-            className={`edit-icon ${editMode ? "active" : ""}`}
-            title={editMode ? "Exit Edit Mode" : "Edit Favourites"}
-            onClick={() => setEditMode(!editMode)}
-            ref={editBtnRef}
-          />
-        </div>
-
-        <br />
-        <div className="all-recipes-desc"></div>
+        <header className="catalog-page-header lmc-page-header"><div>
+          <h1 className="product-page-title">Favorites</h1><p className="product-page-intro">The meals you want to make again.</p></div><div className="catalog-page-actions lmc-page-actions">
+          <Button type="button" className={`product-edit-toggle ${editMode ? "active" : ""}`} aria-pressed={editMode} disabled={loading || !totalElements} onClick={() => setEditMode(!editMode)} ref={editBtnRef}>
+            <FaEdit size={18} aria-hidden="true" />
+            {editMode ? "Done managing" : "Manage favorites"}
+          </Button>
+        </div></header>
+        {editMode && <p className="library-manage-note">Choose a recipe to remove.</p>}
 
         <>
-          <RecipeList
-            recipes={favRecipes}
+          {loading && <RecipeList loading recipes={[]} />}
+          {error && <div className="product-status"><Alert as="p">{error}</Alert><Button type="button" className="product-edit-toggle" onClick={() => setRefreshVersion((version) => version + 1)}>Try again</Button></div>}
+          {!loading && !error && totalElements === 0 && <div className="library-empty"><h2>No favorites yet</h2><p>Save recipes from the collection.</p><Link to="/recipes" className="lmc-button lmc-button--primary">Explore recipes</Link></div>}
+          {!loading && !error && totalElements > 0 && <RecipeList
+            recipes={visibleRecipes}
             editMode={editMode}
             onRemove={handleRemove}
-            onReorder={handleReorder}
             onExitEditMode={() => setEditMode(false)}
             ignoreClickRefs={[editBtnRef]}
-          />
+          />}
 
-          <br />
 
-          {!loading && (
-            <div className="pagination-wrapper">
+
+          {!loading && !error && totalElements > 0 && (
+            <div className="pagination-wrapper catalog-pagination">
               <div className="pagination-meta">
                 <span>
                   <b>
@@ -196,7 +115,7 @@ export default function Favourites() {
               </div>
 
               <div className="pagination-numbers">
-                <span
+                <Button type="button" aria-label="Previous page" disabled={page <= 1}
                   className={`page-prev ${page === 1 ? "disabled" : ""}`}
                   onClick={() => page > 1 && setPage(page - 1)}
                 >
@@ -209,38 +128,30 @@ export default function Favourites() {
                   >
                     <path d="M0 7L8 14L8 0L0 7Z" fill="#1E1E1E" />
                   </svg>
-                </span>
+                </Button>
 
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => {
-                    if (totalPages <= 7) return true;
-                    if (p === 1 || p === totalPages) return true;
-                    if (Math.abs(p - page) <= 1) return true;
-                    if (page <= 3 && p <= 3) return true;
-                    if (page >= totalPages - 2 && p >= totalPages - 2)
-                      return true;
-                    return false;
-                  })
+                {paginationPages(page, totalPages)
                   .map((p, idx, arr) => {
                     const prev = arr[idx - 1];
                     const showDots = prev && p - prev > 1;
 
                     return (
-                      <span key={p} className="pagination-item">
+                      <span key={p} className={`pagination-item${p === page ? " is-current" : ""}`}>
                         {showDots && <span className="ellipsis">...</span>}
-                        <span
+                        <Button type="button" aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined}
                           className={`page-number ${
                             p === page ? "current" : ""
                           }`}
                           onClick={() => setPage(p)}
                         >
                           {p}
-                        </span>
+                        </Button>
                       </span>
                     );
                   })}
 
-                <span
+                <span className="catalog-page-total">of {totalPages}</span>
+                <Button type="button" aria-label="Next page" disabled={page >= totalPages}
                   className={`page-next ${
                     page === totalPages ? "disabled" : ""
                   }`}
@@ -255,12 +166,19 @@ export default function Favourites() {
                   >
                     <path d="M8 7L0 14L0 0L8 7Z" fill="#1E1E1E" />
                   </svg>
-                </span>
+                </Button>
               </div>
             </div>
           )}
         </>
       </div>
-    </section>
+    </main>
   );
+}
+
+export default function Favourites() {
+  const { user, loading } = useAuth();
+  if (loading) return <main className="product-page layout-wrapper"><h1 className="product-page-title">Favorites</h1><p role="status">Checking your account…</p></main>;
+  if (!user) return <Navigate to="/login" state={{ from: { pathname: '/favourites' } }} replace/>;
+  return <FavouritesContent key={user.id} user={user}/>;
 }

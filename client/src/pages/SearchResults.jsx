@@ -1,12 +1,14 @@
-import { useSearchParams } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import Alert from "../components/ui/Alert";
+import { catalogRequest } from "../utils/catalogApi";
+import Button from "../components/ui/Button";
+import { paginationPages } from "../utils/pagination";
+import { apiUrl } from "../utils/api";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import RecipeList from "./../components/RecipeList";
 import SortDropdown from "./../components/SortDropdown";
 
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-gsap.registerPlugin(ScrollTrigger);
 
 const RESULTS_PER_PAGE = 24;
 
@@ -18,225 +20,121 @@ export default function SearchResults() {
   const allergies = searchParams.getAll("allergies");
   const categories = searchParams.getAll("categories");
   const dietaryPreferences = searchParams.getAll("dietaryPreferences");
+  const prompt = searchParams.get("prompt");
 
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
+  const page = Math.max(0, Math.min(10000, Number.parseInt(searchParams.get("page") || "0", 10) || 0)) + 1;
+  const candidateSort = (searchParams.get("sort") || "createdAt").split(",")[0];
+  const normalizedSort = candidateSort === "rating" ? "ratingAverage" : candidateSort;
+  const sort = ["createdAt", "viewCount", "cookTime", "ratingAverage"].includes(normalizedSort) ? normalizedSort : "createdAt";
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
-  const [sort, setSort] = useState(searchParams.get("sort") || "createdAt");
-  const sectionRef = useRef(null);
-
-  const prompt = searchParams.get("prompt");
-  const [extracting, setExtracting] = useState(false);
-  const [cachedPrompt, setCachedPrompt] = useState(null);
-
-  useEffect(() => {
-    const currentPrompt = searchParams.get("prompt");
-    if (currentPrompt) {
-      setCachedPrompt(currentPrompt);
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const hasPromptOnly =
-      prompt &&
-      !searchParams.get("keyword") &&
-      searchParams.getAll("cuisines").length === 0 &&
-      searchParams.getAll("ingredients").length === 0 &&
-      searchParams.getAll("allergies").length === 0 &&
-      searchParams.getAll("categories").length === 0 &&
-      searchParams.getAll("dietaryPreferences").length === 0;
-
-    if (!hasPromptOnly) return;
-
-    const extractFieldsAndUpdateParams = async () => {
-      setExtracting(true);
-      setResults([]);
-      setTotalElements(0);
-      try {
-        const res = await fetch(
-          "https://letmecook.ca/api/opencv/extract_search_fields",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ prompt }),
-          }
-        );
-
-        if (!res.ok) throw new Error("Failed to extract fields");
-        const fields = await res.json();
-
-        const newParams = new URLSearchParams();
-
-        if (fields.keyword) newParams.set("keyword", fields.keyword);
-        if (fields.cuisines)
-          fields.cuisines.forEach((c) => newParams.append("cuisines", c));
-        if (fields.ingredients)
-          fields.ingredients.forEach((i) => newParams.append("ingredients", i));
-        if (fields.allergies)
-          fields.allergies.forEach((a) => newParams.append("allergies", a));
-        if (fields.categories)
-          fields.categories.forEach((c) => newParams.append("categories", c));
-        if (fields.dietaryPreferences)
-          fields.dietaryPreferences.forEach((d) =>
-            newParams.append("dietaryPreferences", d)
-          );
-
-        newParams.set("sort", sort);
-        newParams.set("page", "0");
-        newParams.set("size", RESULTS_PER_PAGE.toString());
-
-        setSearchParams(newParams);
-      } catch (err) {
-        console.error("Failed to extract from prompt:", err);
-        alert("Sorry! We couldn't understand your search.");
-      } finally {
-        setExtracting(false);
-      }
-    };
-
-    extractFieldsAndUpdateParams();
-  }, [prompt]);
+  const [resultError, setResultError] = useState("");
+  const [retryResults, setRetryResults] = useState(0);
+  const filterParams = new URLSearchParams();
+  if (keyword) filterParams.set("keyword", keyword);
+  for (const [key, values] of Object.entries({cuisines, ingredients, allergies, categories, dietaryPreferences})) values.forEach((value) => filterParams.append(key, value));
+  const criteriaQuery = filterParams.toString();
+  const requestParams = new URLSearchParams(criteriaQuery);
+  requestParams.set("sort", `${sort},${sort === "cookTime" ? "asc" : "desc"}`);
+  requestParams.set("page", page - 1);
+  requestParams.set("size", RESULTS_PER_PAGE);
+  const requestQuery = requestParams.toString();
+  const setPage = (value) => setSearchParams((previous) => {
+    const next = new URLSearchParams(previous); next.set("page", String(value - 1)); return next;
+  });
+  const updateSort = (value) => setSearchParams((previous) => {
+    const next = new URLSearchParams(previous); next.set("sort", value); next.set("page", "0"); return next;
+  });
 
   useEffect(() => {
-    const keyword = searchParams.get("keyword");
-    const cuisines = searchParams.getAll("cuisines");
-    const ingredients = searchParams.getAll("ingredients");
-    const allergies = searchParams.getAll("allergies");
-    const categories = searchParams.getAll("categories");
-    const dietaryPreferences = searchParams.getAll("dietaryPreferences");
-
-    const shouldFetch =
-      keyword ||
-      cuisines.length > 0 ||
-      ingredients.length > 0 ||
-      allergies.length > 0 ||
-      categories.length > 0 ||
-      dietaryPreferences.length > 0;
-
-    if (!shouldFetch) return;
-
-    const params = new URLSearchParams();
-    if (keyword) params.set("keyword", keyword);
-    cuisines.forEach((c) => params.append("cuisines", c));
-    ingredients.forEach((i) => params.append("ingredients", i));
-    allergies.forEach((a) => params.append("allergies", a));
-    categories.forEach((c) => params.append("categories", c));
-    dietaryPreferences.forEach((d) => params.append("dietaryPreferences", d));
-
-    params.set("sort", sort);
-    params.set("page", page - 1);
-    params.set("size", RESULTS_PER_PAGE);
-
-    setSearchParams(params);
-    const url = `https://letmecook.ca/api/recipes/search?${params.toString()}`;
+    if (prompt || !criteriaQuery) { setResults([]); setLoading(false); setResultError(""); setTotalElements(0); setTotalPages(1); return; }
+    const controller = new AbortController();
+    let active = true;
+    const url = apiUrl(`/recipes/search?${requestQuery}`);
 
     setLoading(true);
+    setResults([]);
+    setResultError("");
     setTotalElements(0);
 
-    fetch(url)
-      .then((res) => res.json())
+    catalogRequest(url, { signal: controller.signal })
       .then((data) => {
+        if (!active) return;
         const recipes = Array.isArray(data.content) ? data.content : [];
         setResults(recipes);
         setTotalPages(data.totalPages || 1);
         setTotalElements(data.totalElements || 0);
       })
       .catch((err) => {
+        if (!active || err.name === "AbortError") return;
         console.error("Failed to fetch search results:", err);
+        setResultError("Could not load recipes. Please try again.");
         setResults([]);
+        setTotalPages(1);
       })
       .finally(() => {
-        setLoading(false);
+        if (active) setLoading(false);
       });
-  }, [searchParams, sort, page]);
 
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (el) {
-      gsap.fromTo(
-        el,
-        { opacity: 1, y: 100 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: el,
-            start: "top 100%",
-            toggleActions: "play none none none",
-          },
-        }
-      );
-    }
-  }, []);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [prompt, criteriaQuery, requestQuery, retryResults]);
 
+
+  if (prompt) {
+    const conditions = [prompt, ingredients.length && `Use ${ingredients.join(", ")}.`, allergies.length && `Exclude ${allergies.join(", ")}.`, dietaryPreferences.length && `Diet: ${dietaryPreferences.join(", ")}.`, cuisines.length && `Cuisine: ${cuisines.join(", ")}.`, categories.length && `Category: ${categories.join(", ")}.`].filter(Boolean).join(" ");
+    return <Navigate replace to={`/sunny?${new URLSearchParams({prompt: conditions}).toString()}`} />;
+  }
   return (
-    <section className="search-results-section" ref={sectionRef}>
+    <main className="product-page product-search-page search-results-section">
       <div className="search-results-bg" />
       <div className="layout-wrapper">
-        <div className="user-prompt">
-          {/*raw prompt */}
-          {cachedPrompt && <div className="prompt-text">"{cachedPrompt}"</div>}
-        </div>
+        <header className="catalog-page-header lmc-page-header">
+          <div><h1 className="product-page-title">Search results</h1></div>
+          <SortDropdown sort={sort} setSort={updateSort} />
+        </header>
 
-        <br />
 
-        <div className="results-header">
-          <h3 style={{ marginLeft: "2px" }}>Results</h3>
-          <SortDropdown sort={sort} setSort={setSort} />
-        </div>
-
-        {/*extracted filters */}
-        {results.length !== 0 && (
+        {criteriaQuery && (
           <div className="filter-summary">
-            <br />
+
             {[
               keyword && `Keyword: ${keyword}`,
               cuisines.length > 0 && `Cuisines: ${cuisines.join(", ")}`,
               ingredients.length > 0 &&
                 `Ingredients: ${ingredients.join(", ")}`,
-              allergies.length > 0 && `Allergies: ${allergies.join(", ")}`,
+              allergies.length > 0 && `Exclude: ${allergies.join(", ")}`,
               categories.length > 0 && `Categories: ${categories.join(", ")}`,
               dietaryPreferences.length > 0 &&
-                `Dietary: ${dietaryPreferences.join(", ")}`,
+                `Diet: ${dietaryPreferences.join(", ")}`,
             ]
               .filter(Boolean)
-              .join(", ")}
+              .map((condition,index) => <span className="search-constraint" key={index}>{condition}</span>)}
             {totalElements > 0 && !loading && (
-              <span className="results-count">&nbsp;&nbsp;{totalElements}</span>
+              <span className="results-count">{totalElements} matching recipes</span>
             )}
           </div>
         )}
 
-        {/* <br /> */}
+        {resultError && <Alert as="p" className="product-status">{resultError} <Button type="button" className="lmc-button lmc-button--secondary" onClick={() => setRetryResults((value) => value + 1)}>Retry</Button></Alert>}
 
-        {!extracting && results.length === 0 && !loading ? (
+        {!resultError && results.length === 0 && !loading ? (
           <>
-            <br />
-            <p style={{ marginLeft: "4px" }}>No results found.</p>
+
+            <div className="product-empty" role="status"><p>{criteriaQuery ? "No recipes match. Try fewer filters." : "Start with a dish, ingredient or cooking idea."}</p><Link to="/recipes" className="lmc-button lmc-button--secondary">Explore recipes</Link></div>
           </>
         ) : (
           <>
             <RecipeList
-              recipes={
-                loading || extracting
-                  ? Array.from({ length: 24 }, (_, i) => ({
-                      id: `placeholder-${i}`,
-                      title: "Loading...",
-                      authorName: "Please wait",
-                      imageUrl: "/assets/placeholder.jpg",
-                      cookingTime: "...",
-                    }))
-                  : results
-              }
+              loading={loading}
+              recipes={results}
             />
 
-            <div className="pagination-wrapper">
+            {!loading && totalElements > 0 && <div className="pagination-wrapper">
               <div className="pagination-meta">
                 <span>
                   <b>
@@ -247,8 +145,8 @@ export default function SearchResults() {
                 </span>
               </div>
 
-              <div className="pagination-numbers">
-                <span
+              <div className="pagination-numbers catalog-pagination">
+                <Button type="button" aria-label="Previous page" disabled={page <= 1}
                   className={`page-prev ${page === 1 ? "disabled" : ""}`}
                   onClick={() => page > 1 && setPage(page - 1)}
                 >
@@ -261,38 +159,29 @@ export default function SearchResults() {
                   >
                     <path d="M0 7L8 14L8 0L0 7Z" fill="#1E1E1E" />
                   </svg>
-                </span>
+                </Button>
 
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => {
-                    if (totalPages <= 7) return true;
-                    if (p === 1 || p === totalPages) return true;
-                    if (Math.abs(p - page) <= 1) return true;
-                    if (page <= 3 && p <= 3) return true;
-                    if (page >= totalPages - 2 && p >= totalPages - 2)
-                      return true;
-                    return false;
-                  })
-                  .map((p, idx, arr) => {
+                {paginationPages(page, totalPages).map((p, idx, arr) => {
                     const prev = arr[idx - 1];
                     const showDots = prev && p - prev > 1;
 
                     return (
-                      <span key={p} className="pagination-item">
+                      <span key={p} className={`pagination-item${p === page ? " is-current" : ""}`}>
                         {showDots && <span className="ellipsis">...</span>}
-                        <span
+                        <Button type="button" aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined}
                           className={`page-number ${
                             p === page ? "current" : ""
                           }`}
                           onClick={() => setPage(p)}
                         >
                           {p}
-                        </span>
+                        </Button>
                       </span>
                     );
                   })}
 
-                <span
+                <span className="catalog-page-total">of {totalPages}</span>
+                  <Button type="button" aria-label="Next page" disabled={page >= totalPages}
                   className={`page-next ${
                     page === totalPages ? "disabled" : ""
                   }`}
@@ -307,12 +196,12 @@ export default function SearchResults() {
                   >
                     <path d="M8 7L0 14L0 0L8 7Z" fill="#1E1E1E" />
                   </svg>
-                </span>
+                </Button>
               </div>
-            </div>
+            </div>}
           </>
         )}
       </div>
-    </section>
+    </main>
   );
 }

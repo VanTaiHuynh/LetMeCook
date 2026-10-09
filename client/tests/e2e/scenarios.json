@@ -1,0 +1,171 @@
+{
+  "schemaVersion": "local-e2e.v1",
+  "runner": "Codex Cua browser interaction by release QA owner; no automated Playwright invocation.",
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "name": "tablet",
+      "width": 820,
+      "height": 1180
+    },
+    {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "status": "saved_scenarios_pending_release_owner_browser_acceptance",
+  "scenarios": [
+    {
+      "id": "recipe-recovery",
+      "route": "/recipes/:id",
+      "steps": [
+        "Load through controlled500 fault; verify recoverable Retry and no private SEO.",
+        "Retry200; source recipe stays visible even if activity write fails."
+      ],
+      "assertions": [
+        "No spinner after failure",
+        "No404mislabel"
+      ]
+    },
+    {
+      "id": "actor-isolation",
+      "route": "/recipes/:id",
+      "steps": [
+        "Leave delayed private actor A detail request pending.",
+        "Switch actor to B; previous request aborts and old private title/photo/metadata never appears."
+      ],
+      "assertions": [
+        "Transport expected actor enforced",
+        "No persistent response cache"
+      ]
+    },
+    {
+      "id": "reviews",
+      "route": "/recipes/:id",
+      "steps": [
+        "Use local1105-review fixture; click Next and change Date\u2192Overall rating.",
+        "Inspect bounded12/page Java calls and page reset; verify deterministic server ordering."
+      ],
+      "assertions": [
+        "No full-corpus browser download"
+      ]
+    },
+    {
+      "id": "taste",
+      "route": "/cook-along/:id",
+      "steps": [
+        "Complete with explicit stock confirmation.",
+        "Expand How did it taste, select rating and soft preferences, save, reload."
+      ],
+      "assertions": [
+        "Own-only feedback",
+        "No public review/allergy mutation"
+      ]
+    },
+    {
+      "id": "leftovers",
+      "route": "/cook-along/:id",
+      "steps": [
+        "Expand Save leftovers, enter portions/date; save disabled until checked.",
+        "Save; reload Pantry; record only explicitly eaten portions, confirm, retry identical receipt after fault."
+      ],
+      "assertions": [
+        "No raw-stock double debit",
+        "Stale version409keeps draft"
+      ]
+    },
+    {
+      "id": "sharing",
+      "route": "/household?householdId=:id",
+      "steps": [
+        "As accepted viewer expand My preference sharing; opt in own preferences.",
+        "Revoke own sharing; verify next explicit household plan excludes that member and old draft cannot bypass validation."
+      ],
+      "assertions": [
+        "Cannot enable another member",
+        "Viewer has no stock writes"
+      ]
+    },
+    {
+      "id": "planner-reuse",
+      "route": "/meal-planner?householdId=:id",
+      "steps": [
+        "Explicitly check Reuse confirmed leftovers and Include shared household preferences.",
+        "Generate/recalculate/save; retain lot/version, show prepared servings and Pantry link; observe missing-only grocery preview."
+      ],
+      "assertions": [
+        "Must-use raw stock disables leftovers",
+        "No consumption on planning/save"
+      ]
+    },
+    {
+      "id": "sunny-clarification",
+      "route": "/sunny",
+      "steps": [
+        "Submit an ambiguous/contradictory request with No peanuts and time30.",
+        "Answer at most2questions; send original unchanged prompt, signed context and only asked IDs.",
+        "Edit original prompt; context clears; unresolved contradiction gives422guidance."
+      ],
+      "assertions": [
+        "No zero-match display for questions",
+        "Hard restrictions never relaxed"
+      ]
+    },
+    {
+      "id": "ai-cancel",
+      "route": "/sunny",
+      "steps": [
+        "Start a delayed request; explicit Cancel or navigate away.",
+        "Verify one owner/token-bound cancellation; old result never appears; no secret stored."
+      ],
+      "assertions": [
+        "Cancellation attempt bounded5s",
+        "Deadline invokes cancel too"
+      ]
+    },
+    {
+      "id": "guided-cooking",
+      "route": "/cook-along/:id",
+      "steps": [
+        "Press Start guided cooking; hear local English source step; Pause reading, Play, Replay.",
+        "Choose stated duration; confirm Start timer; arrange2due timers during source or paused reading.",
+        "Observe cue then queued reminders without overlap; manually acknowledge through CAS; source step never auto advances."
+      ],
+      "assertions": [
+        "Keep screen open for audio",
+        "No guessed doneness",
+        "Timers source/account cleanup"
+      ]
+    },
+    {
+      "id": "timer-resume",
+      "route": "/cook-along/:id",
+      "steps": [
+        "Start timer; leave/return or suspend tab past endsAt.",
+        "Refresh timestamp on visibility/focus; countdown remains absolute; show due once until ack."
+      ],
+      "assertions": [
+        "No restarted timer",
+        "No background scheduling promise"
+      ]
+    },
+    {
+      "id": "creator-publication",
+      "route": "/creator",
+      "steps": [
+        "Defaultdisabled: compact unavailable; no publish action.",
+        "In isolated owner-enabled fixture only: require permissions acknowledgment and CAS; inspect public /collections/:slug.",
+        "Unpublish or revoke recipe/permission; fresh public read404oromitsrevoked recipe; restore flag."
+      ],
+      "assertions": [
+        "No private scope/account data",
+        "No actual internet publication"
+      ]
+    }
+  ]
+}

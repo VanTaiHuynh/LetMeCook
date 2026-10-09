@@ -1,40 +1,16 @@
+import Button from "../components/ui/Button";
 import { useRef, useEffect, useState } from "react";
 import RecipeCard from "./RecipeCard";
+import { useRecipeRatings } from "../utils/useRecipeRatings";
+import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
+import { httpClient } from "../utils/httpClient";
+import { useAuth } from "../context/AuthContext";
 
 const MAX_RECIPES = 20;
 
-const FALLBACK_RECIPE = [
-  {
-    id: "fallback-01",
-    title: "One-Pot Miso-Turmeric Salmon and Coconut Rice",
-    imageUrl: "/assets/01.jpg",
-    authorName: "Yotam Ottolenghi",
-    cookingTime: 90,
-  },
-  {
-    id: "fallback-02",
-    title: "Chicken With Tender Lettuce, Peas and Prosciutto",
-    imageUrl: "/assets/02.jpg",
-    authorName: "Cybelle Tondu",
-    cookingTime: 25,
-  },
-  {
-    id: "fallback-03",
-    title: "Crispy Halloumi With Tomatoes and White Beans",
-    imageUrl: "/assets/03.jpg",
-    authorName: "Nargisse Benkabbou",
-    cookingTime: 30,
-  },
-  {
-    id: "fallback-04",
-    title: "Pasta Primavera",
-    imageUrl: "/assets/04.jpg",
-    authorName: "Melissa Clark",
-    cookingTime: 45,
-  },
-];
-
-export default function Carousel({ dataSource }) {
+export default function Carousel({ dataSource, authenticated = false, label = "Recipe collection" }) {
+  const { user, loading: authLoading } = useAuth();
+  const actorId = user?.id || null;
   const carouselRef = useRef(null);
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
@@ -43,25 +19,29 @@ export default function Carousel({ dataSource }) {
   const lastX = useRef(0);
   const lastTime = useRef(0);
   const momentumFrame = useRef(null);
-  const resumeTimeout = useRef(null);
 
   const [recipes, setRecipes] = useState([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [retry, setRetry] = useState(0);
+  const [edges, setEdges] = useState({ start: true, end: true });
 
-  const dataToRender = (error ? FALLBACK_RECIPE : recipes).slice(
+  const dataToRender = (error ? [] : recipes).slice(
     0,
     MAX_RECIPES
   );
 
+  const ratings = useRecipeRatings(dataToRender, !loading && !error);
+
   useEffect(() => {
+    if (authenticated && authLoading) return;
+    const controller = new AbortController();
+    let active = true;
+    setLoading(true);
+    setError(false);
     const fetchRecipes = async () => {
       try {
-        const res = await fetch(dataSource);
-        if (!res.ok) throw new Error("Network error");
-
-        const data = await res.json();
-        console.log("API response:", data); // helpful debug
+        const data = await httpClient.json(dataSource, { signal: controller.signal, auth: authenticated ? "required" : "none", ...(authenticated ? { actorId } : {}) });
 
         let recipeList = [];
 
@@ -75,21 +55,45 @@ export default function Carousel({ dataSource }) {
           throw new Error("Unexpected API response structure");
         }
 
-        if (recipeList.length === 0) {
-          throw new Error("Empty recipe list");
-        }
-
-        setRecipes(recipeList);
+        if (active) setRecipes(recipeList);
       } catch (err) {
+        if (!active || err.name === "AbortError") return;
         console.error("Failed to fetch recipes:", err);
         setError(true);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchRecipes();
-  }, []);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [dataSource, authenticated, retry, actorId, authLoading]);
+
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+    const updateEdges = () => setEdges({
+      start: carousel.scrollLeft <= 2,
+      end: carousel.scrollLeft + carousel.clientWidth >= carousel.scrollWidth - 2,
+    });
+    updateEdges();
+    const observer = new ResizeObserver(updateEdges);
+    observer.observe(carousel);
+    const track = carousel.querySelector(".carousel-track");
+    if (track) observer.observe(track);
+    carousel.addEventListener("scroll", updateEdges, { passive: true });
+    return () => { observer.disconnect(); carousel.removeEventListener("scroll", updateEdges); };
+  }, [loading, recipes]);
+
+  const move = (direction) => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+    carousel.scrollBy({ left: direction * Math.max(240, carousel.clientWidth - 24),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -102,8 +106,22 @@ export default function Carousel({ dataSource }) {
 
     let preventClick = false;
 
+    const cancelDrag = () => {
+      isDragging.current = false;
+      velocity.current = 0;
+      preventClick = false;
+      cancelAnimationFrame(momentumFrame.current);
+      momentumFrame.current = null;
+      carousel.classList.remove("dragging");
+      document.body.classList.remove("grabbing-cursor");
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) cancelDrag();
+    };
+
     const handleMouseDown = (point, e) => {
-      e?.preventDefault();
+      if (e.button !== 0) return;
       isDragging.current = true;
       dragStartX.current = point.pageX;
       scrollStart.current = carousel.scrollLeft;
@@ -118,7 +136,7 @@ export default function Carousel({ dataSource }) {
     const handleMouseMove = (point) => {
       if (!isDragging.current) return;
       const dx = point.pageX - dragStartX.current;
-      if (Math.abs(dx) > 5) preventClick = true;
+      if (Math.abs(dx) > 5) { preventClick = true; point.preventDefault(); }
 
       const now = performance.now();
       const deltaX = point.pageX - lastX.current;
@@ -133,6 +151,7 @@ export default function Carousel({ dataSource }) {
     };
 
     const handleMouseUp = () => {
+      if (!isDragging.current) return;
       isDragging.current = false;
       carousel.classList.remove("dragging");
 
@@ -142,7 +161,7 @@ export default function Carousel({ dataSource }) {
         velocity.current *= 0.95;
         momentumFrame.current = requestAnimationFrame(applyMomentum);
       };
-      momentumFrame.current = requestAnimationFrame(applyMomentum);
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) momentumFrame.current = requestAnimationFrame(applyMomentum);
       document.body.classList.remove("grabbing-cursor");
     };
 
@@ -155,54 +174,45 @@ export default function Carousel({ dataSource }) {
     };
 
     const onMouseDown = (e) => handleMouseDown(e, e);
-    const onTouchStart = (e) => handleMouseDown(e.touches[0], e);
-    const onTouchMove = (e) => handleMouseMove(e.touches[0]);
+    const preventNativeDrag = (event) => event.preventDefault();
 
     track.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("click", handleClick, true);
-    track.addEventListener("touchstart", onTouchStart);
-    window.addEventListener("touchmove", onTouchMove);
-    window.addEventListener("touchend", handleMouseUp);
+    window.addEventListener("blur", cancelDrag);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    track.addEventListener("click", handleClick, true);
+    track.addEventListener("dragstart", preventNativeDrag);
 
     return () => {
       track.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("click", handleClick, true);
-      track.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", handleMouseUp);
+      window.removeEventListener("blur", cancelDrag);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      track.removeEventListener("click", handleClick, true);
+      track.removeEventListener("dragstart", preventNativeDrag);
 
-      if (resumeTimeout.current) clearTimeout(resumeTimeout.current);
-      cancelAnimationFrame(momentumFrame.current);
+      cancelDrag();
     };
   }, [loading]);
 
   return (
-    <div className="carousel" ref={carouselRef}>
-      <div className="carousel-track">
-        {(loading ? FALLBACK_RECIPE : dataToRender).map((recipe, i) => (
-          <RecipeCard
-            key={`${recipe.id}-${i}`}
-            id={loading ? "" : recipe.id}
-            title={loading ? "Loading..." : recipe.title}
-            author={loading ? "Please wait" : recipe.authorName}
-            imageUrl={loading ? "/assets/placeholder.jpg" : recipe.imageUrl}
-            cookingTime={loading ? "..." : recipe.cookingTime}
-          />
-        ))}
-
-        {/* SEE ALL LINK */}
-        {/* {!loading && (
-          <a href="/recipes" className="see-all-card">
-            <div className="see-all-inner">
-              <span>See All Recipes {`>>`} </span>
-            </div>
-          </a>
-        )} */}
+    <div className="carousel-wrapper">
+      {loading && <p className="carousel-feedback" role="status">Loading recipes…</p>}
+      {!loading && error && <p className="carousel-feedback" role="status">Recipes could not be loaded. <Button type="button" className="lmc-button" onClick={() => setRetry((value) => value + 1)}>Retry</Button></p>}
+      {!loading && !error && !recipes.length && <p className="carousel-feedback">No recipes found.</p>}
+      <div className="carousel" ref={carouselRef} role="region" aria-label={label} tabIndex={!loading && dataToRender.length ? 0 : undefined}
+        onKeyDown={event => { if (event.target !== event.currentTarget) return; if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); move(event.key === "ArrowLeft" ? -1 : 1); } }}>
+        <div className="carousel-track">
+          {loading ? Array.from({ length: 4 }, (_, index) => <div key={index} aria-hidden="true" className="recipe-card product-recipe-skeleton"><div className="product-skeleton-image" /><div className="product-skeleton-line" /><div className="product-skeleton-line short" /></div>)
+            : dataToRender.map(recipe => <RecipeCard ratingSummary={ratings[recipe.id]} key={recipe.id} id={recipe.id} title={recipe.title} author={recipe.authorName} imageUrl={recipe.imageUrl} cookingTime={recipe.cookingTime} ratingAverage={recipe.ratingAverage} ratingCount={recipe.ratingCount} />)}
+        </div>
       </div>
+      {!loading && !error && dataToRender.length > 0 && <div className="carousel-controls">
+        <Button type="button" className="lmc-icon-button" disabled={edges.start} aria-label={`Previous recipes in ${label}`} onClick={() => move(-1)}><FaArrowLeft aria-hidden="true" /></Button>
+        <Button type="button" className="lmc-icon-button" disabled={edges.end} aria-label={`Next recipes in ${label}`} onClick={() => move(1)}><FaArrowRight aria-hidden="true" /></Button>
+      </div>}
     </div>
   );
 }

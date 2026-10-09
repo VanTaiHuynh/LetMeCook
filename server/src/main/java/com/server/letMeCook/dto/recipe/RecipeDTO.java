@@ -14,8 +14,17 @@ public class RecipeDTO {
     private UUID id;
     private String title;
     private String description;
+    private double ratingAverage;
+    private int ratingCount;
     private float servings;
     private String imageUrl;
+    private String sourceUrl;
+    private String sourceLicense;
+    private String sourceAuthor;
+    private String imageSourceUrl;
+    private String imageAuthor;
+    private String imageLicense;
+    private String imageKind;
     private boolean isPublic;
     private String authorName;
     private LocalDateTime createdAt;

@@ -1,47 +1,20 @@
 import Carousel from "./Carousel";
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
 
 export default function CarouselSection({
   sectionClass = "",
   title = "",
   dataSource,
   actionButton = null,
+  authenticated = false,
 }) {
-  const sectionRef = useRef();
-
-  useEffect(() => {
-    const el = sectionRef.current;
-
-    gsap.fromTo(
-      el,
-      { opacity: 1, y: 100 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: el,
-          start: "top 100%",
-          toggleActions: "play none none none",
-        },
-      }
-    );
-  }, []);
-
   return (
-    <section ref={sectionRef} className={`carousel-section ${sectionClass}`}>
-      <div className="carousel-section-bg" />
+    <section className={`carousel-section ${sectionClass}`}>
       <div className="layout-wrapper">
         <div className="section-header">
-          {title && <div className="section-title">{title}</div>}
+          {title && <h2 className="section-title">{title}</h2>}
           {actionButton && <div className="section-button">{actionButton}</div>}
         </div>
-        <Carousel dataSource={dataSource} />
+        <Carousel dataSource={dataSource} authenticated={authenticated} label={title || "Recipe collection"} />
       </div>
     </section>
   );

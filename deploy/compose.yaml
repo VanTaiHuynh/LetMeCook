@@ -1,0 +1,105 @@
+name: letmecook
+services:
+  mailpit:
+    image: axllent/mailpit:v1.27.4
+    container_name: letmecook-mailpit
+    user: "1005:1005"
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      MP_SMTP_BIND_ADDR: 127.0.0.1:56425
+      MP_UI_BIND_ADDR: 127.0.0.1:56426
+      MP_MAX_MESSAGES: 1000
+      MP_DATABASE: /tmp/mailpit.db
+  recommendation:
+    container_name: letmecook-recommendation
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.recommendation
+    user: "1005:1005"
+    network_mode: host
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      SUPABASE_HOST: 127.0.0.1
+      SUPABASE_PORT: 56422
+      SUPABASE_USER: letmecook_worker
+      SUPABASE_PASSWORD: ${WORKER_DATABASE_PASSWORD:?Run deploy/provision-local-roles.py first}
+      SUPABASE_DB: postgres
+      OLLAMA_URL: http://127.0.0.1:11434
+      LOCAL_AI_TEXT_MODEL: ${LOCAL_AI_TEXT_MODEL:-letmecook-text:qwen3-8b-500a1f067a9f}
+      LOCAL_AI_TEXT_DIGEST: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+      LOCAL_AI_VISION_MODEL: ${LOCAL_AI_VISION_MODEL:-letmecook-vision:qwen3-vl-4b-ee4b975b58c1}
+      LOCAL_AI_VISION_DIGEST: ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b
+      LOCAL_TTS_ENGINE: piper
+      LOCAL_PIPER_MODEL_DIR: /app/model/voice/piper
+      RECOMMENDATION_ENGINE: hybrid-v2
+      HYBRID_INDEX_DIR: /app/model/hybrid
+      HYBRID_EMBED_MODEL: qwen3-embedding:0.6b
+      HYBRID_EMBED_DIGEST: ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-16}
+      MKL_NUM_THREADS: ${MKL_NUM_THREADS:-16}
+      OPENBLAS_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    volumes:
+      - recommendation-model:/app/model
+      - recommendation-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9501/health/ready?capability=recommendation', timeout=5)"]
+      interval: 20s
+      timeout: 10s
+      start_period: 600s
+      retries: 3
+  backend:
+    container_name: letmecook-backend
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    user: "1005:1005"
+    network_mode: host
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:56422/postgres
+      SPRING_DATASOURCE_USERNAME: letmecook_gateway
+      SPRING_DATASOURCE_PASSWORD: ${GATEWAY_DATABASE_PASSWORD:?Run deploy/provision-local-roles.py first}
+      SERVER_ADDRESS: 127.0.0.1
+      SERVER_PORT: 9402
+      RECOMMENDATION_URL: http://127.0.0.1:9501
+      LOCAL_AI_URL: http://127.0.0.1:9501
+      CORS_ORIGINS: http://localhost:9401,http://127.0.0.1:9401
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "4", "http://127.0.0.1:9402/api/health/ready"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
+  web:
+    container_name: letmecook-web
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_PUBLIC_SITE_ORIGIN: ${PUBLIC_SITE_ORIGIN:-}
+        VITE_SEO_INDEXING_ENABLED: ${SEO_INDEXING_ENABLED:-false}
+    user: "1005:1005"
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      PUBLIC_SITE_ORIGIN: ${PUBLIC_SITE_ORIGIN:-}
+      SEO_INDEXING_ENABLED: ${SEO_INDEXING_ENABLED:-false}
+      SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?Set the existing public Supabase anonymous browser key}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9401/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+volumes:
+  recommendation-model:
+  recommendation-data:

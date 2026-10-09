@@ -13,4 +13,5 @@ public class RecipeSearchFields {
     private Set<String> allergies;
     private Set<String> categories;
     private Set<String> dietaryPreferences;
+    private Integer maxCookingTime;
 }

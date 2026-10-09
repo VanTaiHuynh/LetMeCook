@@ -37,6 +37,39 @@ public class Recipe {
     @Column(name = "image_url")
     private String imageUrl = "";
 
+    @Column(name = "source_url", columnDefinition = "TEXT")
+    private String sourceUrl;
+
+    @Column(name = "source_license", columnDefinition = "TEXT")
+    private String sourceLicense;
+
+    @Column(name = "source_author", columnDefinition = "TEXT")
+    private String sourceAuthor;
+
+    @Column(name = "image_source_url", columnDefinition = "TEXT")
+    private String imageSourceUrl;
+
+    @Column(name = "image_author", columnDefinition = "TEXT")
+    private String imageAuthor;
+
+    @Column(name = "image_license", columnDefinition = "TEXT")
+    private String imageLicense;
+
+    @Column(name = "image_kind", columnDefinition = "TEXT")
+    private String imageKind;
+
+    @Column(name = "demo_permission_confirmed")
+    private boolean demoPermissionConfirmed = false;
+
+    @Column(name = "demo_permission_note", columnDefinition = "TEXT")
+    private String demoPermissionNote;
+
+    @Column(name = "rating_average")
+    private double ratingAverage = 0;
+
+    @Column(name = "rating_count")
+    private int ratingCount = 0;
+
     @Column(name = "is_public")
     private boolean isPublic = true;
 
@@ -58,6 +91,7 @@ public class Recipe {
     private User author;
 
     @ManyToMany(fetch = FetchType.LAZY)
+    @org.hibernate.annotations.BatchSize(size=50)
     @JoinTable(
             name = "recipe_dietary_pref",
             joinColumns = @JoinColumn(name = "recipe_id"),
@@ -66,6 +100,7 @@ public class Recipe {
     private Set<DietaryPreference> dietaryPreferences = new HashSet<>();
 
     @ManyToMany
+    @org.hibernate.annotations.BatchSize(size=50)
     @JoinTable(
             name = "recipe_categories",
             joinColumns = @JoinColumn(name = "recipe_id"),
@@ -74,6 +109,7 @@ public class Recipe {
     private Set<Category> categories = new HashSet<>();
 
     @ManyToMany
+    @org.hibernate.annotations.BatchSize(size=50)
     @JoinTable(
             name = "recipe_cuisines",
             joinColumns = @JoinColumn(name = "recipe_id"),
@@ -82,6 +118,7 @@ public class Recipe {
     private Set<Cuisine> cuisines = new HashSet<>();
 
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size=50)
     private Set<RecipeIngredient> recipeIngredients = new HashSet<>();
 
 }

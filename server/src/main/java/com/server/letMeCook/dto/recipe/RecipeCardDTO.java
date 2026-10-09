@@ -14,6 +14,15 @@ public class RecipeCardDTO {
     private String authorName;
     private float servings;
     private String imageUrl;
+    private String sourceUrl;
+    private String sourceLicense;
+    private String sourceAuthor;
+    private String imageSourceUrl;
+    private String imageAuthor;
+    private String imageLicense;
+    private String imageKind;
     private int cookingTime;
+    private double ratingAverage;
+    private int ratingCount;
 
 }

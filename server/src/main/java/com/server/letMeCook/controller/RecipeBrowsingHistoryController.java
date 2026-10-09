@@ -9,6 +9,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.SortDefault;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import com.server.letMeCook.security.RequestIdentity;
 
 import java.io.Console;
 import java.util.List;
@@ -27,12 +30,14 @@ public class RecipeBrowsingHistoryController {
     @GetMapping("/{userId}")
     public ResponseEntity<Page<RecipeCardDTO>> getRecentlyViewed(
             @PathVariable UUID userId,
+            @AuthenticationPrincipal Jwt jwt,
             @PageableDefault(size = 10)
             @SortDefault.SortDefaults({
                     @SortDefault(sort = "viewedAt", direction = Sort.Direction.DESC)
             }) Pageable pageable
     ) {
 
+        RequestIdentity.requireOwner(jwt, userId);
         Page<RecipeCardDTO> recipes = browsingHistoryService.getRecentlyViewedRecipeCards(userId, pageable);
         return ResponseEntity.ok(recipes);
     }

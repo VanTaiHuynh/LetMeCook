@@ -1,316 +1,111 @@
+import { catalogRequest } from "../utils/catalogApi";
+import Button from "../components/ui/Button";
+import Field from "../components/ui/Field";
+import { apiUrl } from "../utils/api";
 import { useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { FaTimes, FaCamera, FaSearch, FaMicrophone } from "react-icons/fa";
+import { FaTimes, FaCamera, FaSearch, FaArrowRight, FaSpinner } from "react-icons/fa";
+import { sunnyChef as chef } from "../utils/siteAsset";
+import RecipeImage from "./RecipeImage";
+import "./SearchBarModal.css";
 
 export default function SearchBarModal({ onClose }) {
   const inputRef = useRef(null);
-  const imgRef = useRef(null);
+  const dialogRef = useRef(null);
+  const closeRef = useRef(onClose);
   const navigate = useNavigate();
-  const [imageIngredients, setImageIngredients] = useState([]);
-
-  const modalRef = useRef(null);
   const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [debounceTimer, setDebounceTimer] = useState(null);
+  const [error, setError] = useState("");
+  const [searchSettled, setSearchSettled] = useState(false);
 
-  const [listening, setListening] = useState(false);
-  const recognitionRef = useRef(null);
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, []);
-
-  // useEffect(() => {
-  //   const handleClickOutside = (event) => {
-  //     if (modalRef.current && !modalRef.current.contains(event.target)) {
-  //       onClose(); // Close if clicked outside the modal content
-  //     }
-  //   };
-
-  //   document.addEventListener("mousedown", handleClickOutside);
-  //   return () => {
-  //     document.removeEventListener("mousedown", handleClickOutside);
-  //   };
-  // }, [onClose]);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return; // API not supported
-
-    recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.continuous = false;
-    recognitionRef.current.interimResults = true;
-    recognitionRef.current.lang = "en-US";
-
-    recognitionRef.current.onstart = () => setListening(true);
-    recognitionRef.current.onend = () => setListening(false);
-
-    recognitionRef.current.onresult = (event) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        transcript += event.results[i][0].transcript;
-      }
-      // Remove trailing punctuation like period, comma, question mark, exclamation
-      transcript = transcript
-        .replace(/[.,!?]+$/g, "")
-        .trim()
-        .toLowerCase();
-      setInputValue(transcript);
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    const backgroundRoots = [...document.body.children]
+      .filter(element => !element.contains(dialogRef.current) && !['SCRIPT', 'STYLE'].includes(element.tagName))
+      .map(element => ({ element, previousInert: element.inert }));
+    backgroundRoots.forEach(({ element }) => { element.inert = true; });
+    document.body.style.overflow = "hidden";
+    inputRef.current?.focus();
+    const handleKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); closeRef.current?.(); }
+      if (event.key !== "Tab") return;
+      const controls = [...dialogRef.current.querySelectorAll('button:not(:disabled), textarea:not(:disabled), a[href]')];
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!dialogRef.current.contains(document.activeElement)) { event.preventDefault(); first?.focus(); }
+      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     };
-
-    recognitionRef.current.onerror = (event) => {
-      console.error("Speech recognition error", event.error);
-      setListening(false);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKey);
+      backgroundRoots.forEach(({ element, previousInert }) => { element.inert = previousInert; });
+      if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, []);
 
-  const handleMicClick = () => {
-    if (listening) {
-      recognitionRef.current.stop();
-      // Optionally navigate immediately if inputValue set
-      if (inputValue.trim()) {
-        navigate(`/search?keyword=${encodeURIComponent(inputValue.trim())}`);
-        onClose();
-      }
-    } else {
-      recognitionRef.current.start();
-    }
-  };
-
-  const fetchSuggestions = async (query) => {
-    if (!query) {
-      setSuggestions([]);
-      return;
-    }
-
-    try {
+  useEffect(() => {
+    const controller = new AbortController();
+    setSuggestions([]);
+    setError("");
+    setLoading(false);
+    setSearchSettled(false);
+    if (!inputValue.trim()) return () => controller.abort();
+    const timer = setTimeout(async () => {
       setLoading(true);
-      const response = await fetch(
-        `https://letmecook.ca/api/recipes/search?keyword=${encodeURIComponent(
-          query
-        )}&sort=createdAt&page=0&size=10`
-      );
-      const data = await response.json();
-
-      const titles = data.content.map((recipe) => ({
-        id: recipe.id,
-        title: recipe.title,
-        imageUrl: recipe.imageUrl,
-      }));
-
-      setSuggestions(titles);
-    } catch (error) {
-      console.error("Failed to fetch suggestions", error);
-      setSuggestions([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChange = (e) => {
-    setInputValue(e.target.value);
-  };
-
-  useEffect(() => {
-    if (!inputValue.trim()) {
-      setSuggestions([]);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      fetchSuggestions(inputValue.trim());
+      try {
+        const query = new URLSearchParams({ keyword: inputValue.trim(), page: "0", size: "5" });
+        const data = await catalogRequest(apiUrl(`/recipes/search?${query}`), { signal: controller.signal });
+        if (!controller.signal.aborted) setSuggestions(Array.isArray(data.content) ? data.content : []);
+      } catch (error) {
+        if (!controller.signal.aborted) setError(error.message);
+      } finally {
+        if (!controller.signal.aborted) { setLoading(false); setSearchSettled(true); }
+      }
     }, 300);
-
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [inputValue]);
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-
-      const prompt = inputRef?.current?.value.trim() || inputValue?.trim();
-
-      if (!prompt && imageIngredients.length === 0) {
-        return;
-      }
-
-      const params = new URLSearchParams();
-
-      if (prompt) {
-        params.set("prompt", prompt);
-      }
-
-      imageIngredients.forEach((i) => {
-        params.append("ingredients", i);
-      });
-
-      params.append("isPublic", "true");
-
-      navigate(`/search?${params.toString()}`);
-      onClose();
-    }
-  };
-
-  const handleSuggestionClick = (id) => {
-    navigate(`/recipes/${id}`);
+  const openSunny = () => {
+    const query = new URLSearchParams();
+    if (inputValue.trim()) query.set("prompt", inputValue.trim());
+    navigate(`/sunny${query.size ? `?${query}` : ""}`);
     onClose();
   };
 
-  const handleCameraClick = () => {
-    imgRef.current.click();
-  };
-
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const base64 = reader.result.split(",")[1];
-
-        const res = await fetch(
-          "https://letmecook.ca/api/opencv/extract_image_ingredients",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageBase64: base64 }),
-          }
-        );
-
-        if (!res.ok)
-          throw new Error("Failed to extract ingredients from image");
-
-        const json = await res.json();
-        const ingredients = json.ingredients || [];
-
-        setImageIngredients(ingredients);
-        console.log("Extracted ingredients from image:", ingredients);
-      } catch (err) {
-        console.error("Image processing error:", err);
-        alert("Failed to extract ingredients from image.");
-      }
-    };
-
-    reader.readAsDataURL(file);
-  };
-
-  return (
-    <div className="search-modal">
-      <div className="search-modal-content" ref={modalRef}>
-        <div className="layout-wrapper">
-          <div className="search-modal-inner">
-            <button
-              className="close-button"
-              onClick={onClose}
-              aria-label="Close search"
-            >
-              <FaTimes size={16} />
-            </button>
-
-            <div
-              className="search-bar-modal-wrapper"
-              style={{ position: "relative" }}
-            >
-              <textarea
-                ref={inputRef}
-                className="search-input"
-                placeholder="Search with Sunny AI"
-                rows={1}
-                value={inputValue}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-              />
-              <FaCamera
-                className={`camera-icon ${
-                  imageIngredients.length > 0 ? "has-image" : ""
-                }`}
-                size={20}
-                onClick={handleCameraClick}
-              />
-
-              {inputValue.trim() === "" && imageIngredients.length === 0 ? (
-                <FaMicrophone
-                  className={`mic-icon ${listening ? "listening" : ""}`}
-                  size={20}
-                  onClick={handleMicClick}
-                  style={{ cursor: "pointer" }}
-                  aria-label={
-                    listening ? "Stop listening" : "Start voice search"
-                  }
-                />
-              ) : (
-                <FaSearch
-                  className="send-icon"
-                  size={20}
-                  onClick={() => {
-                    const prompt = inputValue.trim();
-                    const params = new URLSearchParams();
-
-                    if (prompt) {
-                      params.set("prompt", prompt);
-                    }
-
-                    imageIngredients.forEach((i) => {
-                      params.append("ingredients", i);
-                    });
-
-                    params.append("isPublic", "true");
-
-                    navigate(`/search?${params.toString()}`);
-                    onClose();
-                  }}
-                  style={{ cursor: "pointer" }}
-                  aria-label="Search"
-                />
-              )}
-
-              <input
-                type="file"
-                accept="image/*"
-                ref={imgRef}
-                style={{ display: "none" }}
-                onChange={handleImageUpload}
-              />
-
-              {/* Suggestions Dropdown */}
-              {suggestions.length > 0 && (
-                <ul className="suggestions-list">
-                  {suggestions.map((item, index) => (
-                    <li
-                      key={index}
-                      className="suggestion-item"
-                      onClick={() => handleSuggestionClick(item.id)}
-                    >
-                      {item.imageUrl && (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="suggestion-image"
-                        />
-                      )}
-                      <span>{item.title}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {/* {loading && (
-                <div className="suggestions-loading">Searching recipes...</div>
-              )} */}
-            </div>
-            {imageIngredients.length > 0 && (
-              <div className="image-ingredients-preview">
-                Ingredients from image: {imageIngredients.join(", ")}
-              </div>
-            )}
-          </div>
+  return createPortal(<div className="sunny-search-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="sunny-search-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="sunny-search-heading">
+      <div className="sunny-search-topbar"><Button type="button" className="lmc-icon-button sunny-search-close" aria-label="Close search" onClick={onClose}><FaTimes aria-hidden="true" /></Button></div>
+      <div className="sunny-search-header"><div><h2 id="sunny-search-heading">What’s cooking?</h2><p>Find a recipe by name, or ask Sunny for ideas.</p></div><img src={chef} alt="" /></div>
+      <form onSubmit={(event) => { event.preventDefault(); if (inputValue.trim()) openSunny(); }}>
+        <Field htmlFor="sunny-modal-prompt">Ask Sunny or find a recipe</Field>
+        <textarea id="sunny-modal-prompt" aria-describedby="sunny-search-input-help" ref={inputRef} rows={3} maxLength={2000} value={inputValue}
+          placeholder="A vegan dinner with mushrooms… or a recipe title"
+          onChange={(event) => setInputValue(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); if (inputValue.trim()) openSunny(); } }} />
+        <p id="sunny-search-input-help" className="sunny-search-input-help">Press Enter to ask Sunny. Shift + Enter adds a new line.</p>
+        <div className="sunny-search-actions">
+          <Button type="submit" disabled={!inputValue.trim()} className="lmc-button lmc-button--primary sunny-search-ask">Ask Sunny <FaArrowRight aria-hidden="true" /></Button>
+          <Button type="button" className="lmc-button lmc-button--secondary" disabled={!inputValue.trim()} onClick={() => { navigate(`/search?${new URLSearchParams({ keyword: inputValue.trim() })}`); onClose(); }}><FaSearch aria-hidden="true" /> Search titles</Button>
+          <Button type="button" className="lmc-button lmc-button--quiet" onClick={openSunny}><FaCamera aria-hidden="true" /> Add a photo</Button>
         </div>
-      </div>
-    </div>
-  );
+      </form>
+      {loading && <p className="sunny-search-feedback" role="status"><FaSpinner className="sunny-search-spinner" aria-hidden="true" /> Finding recipe titles…</p>}
+      {error && <p className="sunny-search-feedback" role="status">{error}</p>}
+      {searchSettled && !loading && !error && inputValue.trim() && !suggestions.length && <p className="sunny-search-feedback" role="status">No matching titles yet. Ask Sunny to search by ingredients and cooking preferences.</p>}
+      {suggestions.length > 0 && <ul className="sunny-search-suggestions" aria-label="Matching recipe titles">{suggestions.map((recipe) => <li key={recipe.id}>
+        <Button type="button" onClick={() => { navigate(`/recipes/${recipe.id}`); onClose(); }}>
+          {recipe.imageUrl && <RecipeImage src={recipe.imageUrl} alt="" loading="lazy" />}<span>{recipe.title}</span><FaArrowRight aria-hidden="true" />
+        </Button>
+      </li>)}</ul>}
+      <p className="sunny-search-footnote">Photos open in Sunny, where you can review the ingredients before searching.</p>
+    </section>
+  </div>, document.body);
 }

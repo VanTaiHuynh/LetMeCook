@@ -1,0 +1,20 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS public.lmc_platform_settings (id boolean PRIMARY KEY DEFAULT true CHECK(id), settings jsonb NOT NULL, version integer NOT NULL DEFAULT 1);
+INSERT INTO public.lmc_platform_settings(id,settings) VALUES(true,'{"publicDemo":false,"kitchenEnabled":true,"voiceEnabled":true}') ON CONFLICT(id) DO NOTHING;
+CREATE TABLE IF NOT EXISTS public.lmc_admin_audit (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), actor_id uuid, action text NOT NULL, target text NOT NULL, response_status integer, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.lmc_contacts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),name text NOT NULL,email text NOT NULL,message text NOT NULL,status text NOT NULL DEFAULT 'new' CHECK(status IN('new','read','resolved')),created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.lmc_newsletter (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL, consent_version text NOT NULL, confirmation_hash text, confirmation_expires_at timestamptz, unsubscribe_hash text NOT NULL, confirmed_at timestamptz,unsubscribed_at timestamptz, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.lmc_newsletter_tokens(token_hash text PRIMARY KEY,subscription_id uuid NOT NULL REFERENCES public.lmc_newsletter(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS public.lmc_newsletter_deliveries(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),subscription_id uuid NOT NULL REFERENCES public.lmc_newsletter(id) ON DELETE CASCADE,subject text NOT NULL,status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.lmc_ingredient_aliases(alias text PRIMARY KEY,ingredient_id uuid NOT NULL REFERENCES public.ingredients(id),reviewed_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,review_note text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE public.recipe ADD COLUMN IF NOT EXISTS demo_permission_confirmed boolean NOT NULL DEFAULT false;
+ALTER TABLE public.recipe ADD COLUMN IF NOT EXISTS demo_permission_note text;
+ALTER TABLE public.recipe ADD COLUMN IF NOT EXISTS demo_reviewed_at timestamptz;
+CREATE INDEX IF NOT EXISTS lmc_overall_rating_review ON public.review_ratings(review_id) WHERE category='overall';
+CREATE INDEX IF NOT EXISTS lmc_admin_audit_time ON public.lmc_admin_audit(created_at DESC);
+DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['lmc_platform_settings','lmc_admin_audit','lmc_contacts','lmc_newsletter','lmc_newsletter_deliveries','lmc_newsletter_tokens','lmc_ingredient_aliases'] LOOP
+ EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);
+ EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC, anon, authenticated',t);
+ EXECUTE format('GRANT ALL ON public.%I TO service_role',t);
+END LOOP; END $$;
+COMMIT;

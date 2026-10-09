@@ -4,6 +4,8 @@ import com.server.letMeCook.dto.user.UserPublicDTO;
 import com.server.letMeCook.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
@@ -15,6 +17,6 @@ public class UserService {
     public UserPublicDTO getUserById(UUID id) {
         return userRepository.findById(id)
                 .map(UserPublicDTO::from)
-                .orElse(null);
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 }

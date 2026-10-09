@@ -14,4 +14,7 @@ public interface UserAllergyRepository extends Repository<UserAllergy, UserAller
 
     @Query("SELECT ua.ingredient.id FROM UserAllergy ua WHERE ua.user.id = :userId")
     List<UUID> findAllAllergyIngredientIdsByUserId(@Param("userId") UUID userId);
+
+    @Query("SELECT ua.ingredient.name FROM UserAllergy ua WHERE ua.user.id = :userId")
+    List<String> findAllAllergyIngredientNamesByUserId(@Param("userId") UUID userId);
 }

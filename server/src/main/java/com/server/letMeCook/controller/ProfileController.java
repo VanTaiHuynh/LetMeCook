@@ -1,6 +1,8 @@
 package com.server.letMeCook.controller;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
+import com.server.letMeCook.security.RequestIdentity;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -23,23 +25,21 @@ public class ProfileController {
 
     @GetMapping("/profile")
     public ResponseEntity<?> getProfile(@AuthenticationPrincipal Jwt jwt) {
-        String email = jwt.getClaim("email");
-
-        User user = userRepository.findByEmail(email);
+        User user = userRepository.findById(RequestIdentity.optionalUserId(jwt)).orElse(null);
 
         if (user == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(Map.of("error", "User not found"));
         }
 
-        Map<String, Object> response = Map.of(
-            "full_name", user.getFirstName() + " " + user.getLastName(),
-            "email", user.getEmail(),
-            "cooking_skill", user.getCookingLvl(),
-            "dietary_preg", user.getDietaryPref(),
-            "about_me", user.getAboutMe(),
-            "image_url", user.getImageUrl()
-        );
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("full_name", user.getFirstName() + " " + user.getLastName());
+        response.put("email", user.getEmail());
+        response.put("cooking_skill", user.getCookingLvl());
+        response.put("dietary_preg", user.getDietaryPref()); // Keep the existing client contract.
+        response.put("dietary_pref", user.getDietaryPref());
+        response.put("about_me", user.getAboutMe());
+        response.put("image_url", user.getImageUrl());
         
         return ResponseEntity.ok(response);
     }

@@ -1,0 +1,16 @@
+.product-recipe-detail-page .review-section.recipe-reviews { padding-top: 32px; border-top: 1px solid var(--lmc-line); }
+.recipe-reviews-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 24px; }
+.recipe-reviews-title { min-width: 0; }
+.recipe-reviews-title h2 { margin: 0 0 8px; font: 750 1.5rem/1.3 var(--lmc-font-heading, Raleway, sans-serif); letter-spacing: -.025em; }
+.recipe-reviews-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: 0; color: var(--lmc-muted); font-size: .875rem; line-height: 1.5; }
+.recipe-reviews-summary > svg { color: var(--lmc-ink); width: 16px; height: 16px; }
+.recipe-reviews-summary strong { color: var(--lmc-ink); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.recipe-reviews-summary strong span { font-size: .875rem; font-weight: 400; }
+.recipe-reviews-retry { min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--lmc-ink); font: inherit; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.recipe-reviews-header > .lmc-button { flex-shrink: 0; }
+@media (max-width: 520px) {
+  .product-recipe-detail-page .review-section.recipe-reviews { padding-top: 24px; }
+  .recipe-reviews-header { align-items: stretch; gap: 16px; }
+  .recipe-reviews-title { width: 100%; }
+  .recipe-reviews-header > .lmc-button { width: 100%; }
+}

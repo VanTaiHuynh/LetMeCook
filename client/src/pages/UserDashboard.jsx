@@ -1,173 +1,88 @@
-import { useState, useEffect, useRef } from "react";
-import { supabase } from "../utils/supabaseClient";
-import { useAuth } from "../context/AuthProvider";
-import { Link, useNavigate } from "react-router-dom";
+import Alert from "../components/ui/Alert";
+import Button from "../components/ui/Button";
+import { apiUrl } from "../utils/api";
+import { useState, useEffect } from "react";
+import { accountRequest } from "../utils/accountApi";
+import { useAuth } from "../context/AuthContext";
+import { Link, Navigate } from "react-router-dom";
 
 import SearchBar from "./../components/SearchBar-Home";
 import CarouselSection from "./../components/CarouselSection";
 import MyRecommended from "./../components/MyRecommended";
-import sunnywelcome from "../assets/sunnywelcome.png";
-import hat from "../assets/chef-hat.png";
-import eye from "../assets/eye.png";
-import heart from "../assets/heart.png";
+import { sunnyWelcome as sunnywelcome, chefHat as hat, heart } from "../utils/siteAsset";
 
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-gsap.registerPlugin(ScrollTrigger);
 
-export default function UserDashboard() {
-  const { user } = useAuth();
-  const [favourites, setFavourites] = useState([]);
-  const [history, setHistory] = useState([]);
+function DashboardContent({ user }) {
+  const [favouriteCount, setFavouriteCount] = useState(null);
   const [error, setError] = useState(null);
-  const [recipeCreations, setRecipeCreations] = useState([]);
+  const [creationCount, setCreationCount] = useState(null);
+  const [retry, setRetry] = useState(0);
   const [firstName, setFirstName] = useState("");
 
-  const navigate = useNavigate();
-  const welcomeRef = useRef();
+
 
   useEffect(() => {
-    const el = welcomeRef.current;
+    const controller = new AbortController();
+    let current = true;
+    setFirstName(''); setFavouriteCount(null); setCreationCount(null); setError(null);
+    const load = async () => {
+      try {
+        const summary = await accountRequest('/summary', { signal: controller.signal, actorId: user.id, contractVersion: 'account.v1' });
+        if (!current || controller.signal.aborted) return;
+        setFirstName(summary.fullName || ''); setFavouriteCount(summary.favoriteCount); setCreationCount(summary.recipeCount);
+      } catch (failure) { if (current && !controller.signal.aborted) setError(failure.message); }
+    };
+    load();
+    return () => { current = false; controller.abort(); };
+  }, [user.id, retry]);
 
-    gsap.fromTo(
-      el,
-      { opacity: 1, y: 100 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: el,
-          start: "top 90%",
-          toggleActions: "play none none none",
-        },
-      }
-    );
-  }, []);
 
-  useEffect(() => {
-    if (user) {
-      const getName = async () => {
-        const { data, error } = await supabase
-          .from("users")
-          .select("first_name")
-          .eq("id", user.id)
-          .single();
-
-        if (!error && data) {
-          setFirstName(data.first_name);
-        }
-      };
-
-      getName();
-      fetchFavourites(user.id);
-      fetchHistory(user.id);
-      fetchCreations(user.id);
-      //fetch recommendations(user.id) implement this after AI algorithm is done
-    } else {
-      navigate("/");
-    }
-  }, [user]);
-
-  const fetchFavourites = async (userId) => {
-    let { data, error } = await supabase
-      .from("recipe_favourites")
-      .select("recipe_id, recipe(*)")
-      .eq("user_id", userId);
-
-    if (data) {
-      setFavourites(data.map((r) => r.recipe));
-    }
-    if (error) {
-      setError(error.message);
-    }
-  };
-
-  const fetchHistory = async (userId) => {
-    let { data, error } = await supabase
-      .from("recipe_browsing_history")
-      .select("recipe_id, recipe(*)")
-      .eq("user_id", userId)
-      .order("viewed_at", { ascending: false });
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    setHistory(data ?? []);
-  };
-
-  const fetchCreations = async (userId) => {
-    let { data, error } = await supabase
-      .from("recipe")
-      .select("*")
-      .eq("author_id", userId)
-      .order("created_at", { ascending: false });
-    if (data) {
-      setRecipeCreations(data);
-    }
-    if (error) {
-      setError(error.message);
-    }
-  };
-
-  //const fetchRecommendation = async (userId) => {}
 
   return (
     <>
       {user && (
-        <div ref={welcomeRef} className="welcome-section">
+        <main className="product-page product-dashboard-page welcome-section">
           <div className="welcome-wrapper">
             <div className="welcome-card layout-wrapper">
-              <div className="welcome-text">
+              <section className="welcome-text" aria-label="Find your next meal">
                 <h1>
-                  Welcome back, <span>{firstName || user.email}</span>! 👋
+                  Welcome back{firstName && <>, <span>{firstName}</span></>}!
                 </h1>
-                <p>What’s cooking today? 🍳 Let’s explore something new!</p>
-                <p>
-                  Your cozy corner for simple, delicious, and homey recipes is
-                  always here waiting — whether you’re planning meals for the
-                  week or just looking for some quick inspiration.
-                </p>
                 <div className="search-container">
                   <SearchBar />
                 </div>
-              </div>
+              </section>
+              <aside className="dashboard-kitchen-panel" aria-labelledby="dashboard-kitchen-heading">
+              <h2 id="dashboard-kitchen-heading">Make dinner easier</h2>
               <img
                 src={sunnywelcome}
-                alt="sunny the chef welcome"
+                alt="Sunny welcomes you back"
                 className="welcome-icon"
               />
+              <nav className="dashboard-quick-links" aria-label="Kitchen shortcuts"><Link to="/meal-planner" className="lmc-button lmc-button--primary">Plan your week</Link><Link to="/pantry" className="lmc-button lmc-button--secondary">Open pantry</Link><Link to="/features#next-step" className="lmc-button lmc-button--quiet">Explore your kitchen tools</Link></nav>
+              </aside>
             </div>
 
+            {error && <Alert as="p" className="product-status">Some account details could not be loaded: {error} <Button type="button" className="product-edit-toggle" onClick={() => setRetry(value => value + 1)}>Retry account details</Button></Alert>}
             <div className="stat-section">
               <Link to="/favourites" className="stat-card">
-                <img src={heart} alt="heart" className="icon" />
+                <img src={heart} alt="" className="icon" />
                 <div className="stat-text">
-                  <strong>{favourites.length}</strong>
-                  <p>Favourites</p>
+                  <strong>{favouriteCount ?? '—'}</strong>
+                  <p>Favorites</p>
                 </div>
               </Link>
 
-              {/* <div className="separator"></div>
 
-              <div className="stat-card">
-                <img src={eye} alt="eye" className="icon" />
-                <div className="stat-text">
-                  <strong>{history.length}</strong>
-                  <p>Recently Viewed</p>
-                </div>
-              </div> */}
 
               <div className="separator"></div>
 
               <Link to="/user-recipe" className="stat-card">
-                <img src={hat} alt="hat" className="icon" />
+                <img src={hat} alt="" className="icon" />
                 <div className="stat-text">
-                  <strong>{recipeCreations.length}</strong>
-                  <p>Recipes Created</p>
+                  <strong>{creationCount ?? '—'}</strong>
+                  <p>Your recipes</p>
                 </div>
               </Link>
             </div>
@@ -179,25 +94,33 @@ export default function UserDashboard() {
             <CarouselSection
               title="Recently Viewed"
               sectionClass="section-2"
-              dataSource={`https://letmecook.ca/api/recently-viewed/${user?.id}`}
+              dataSource={apiUrl(`/recently-viewed/${user?.id}`)}
+              authenticated
             />
           </section>
           <section>
             <CarouselSection
               title="Trending Now"
               sectionClass="section-3"
-              dataSource="https://letmecook.ca/api/recipes?sort=viewCount&size=20"
+              dataSource={apiUrl("/recipes?sort=viewCount,desc&size=20")}
             />
           </section>
           <section>
             <CarouselSection
-              title="Quick & Easy Meals"
+              title="Quick recipes"
               sectionClass="section-4"
-              dataSource="https://letmecook.ca/api/recipes?sort=cookTime&size=20"
+              dataSource={apiUrl("/recipes?sort=cookTime,asc&size=20&maxCookTime=30")}
             />
           </section>
-        </div>
+        </main>
       )}
     </>
   );
+}
+
+export default function UserDashboard() {
+  const { user, loading } = useAuth();
+  if (loading) return <main className="product-page layout-wrapper"><h1 className="product-page-title">Your kitchen</h1><p role="status">Checking your account…</p></main>;
+  if (!user) return <Navigate to="/login" state={{ from: { pathname: '/dashboard' } }} replace/>;
+  return <DashboardContent key={user.id} user={user}/>;
 }

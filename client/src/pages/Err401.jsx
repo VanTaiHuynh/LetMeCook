@@ -1,14 +1,8 @@
-import React from 'react';
-import errImage from '../assets/401error.png';
+import { RecoveryPage } from '../components/InformationPages';
+import { error401 as errImage } from "../utils/siteAsset";
 
-const Err401 = () => {
-  return (
-    <div className="error-page">
-      <h1>Error 401: Unauthorized</h1>
-      <p>You do not have permission to view this page. Please log in to access this content.</p>
-      <img src={errImage} alt="Error 401" />
-    </div>
-  );
-};
-
-export default Err401;
+export default function Err401() {
+  return <RecoveryPage code="401" title="Log in to continue" image={errImage} primaryTo="/login" primaryLabel="Log in">
+    You do not have permission to view this page. Please log in to access this content.
+  </RecoveryPage>;
+}

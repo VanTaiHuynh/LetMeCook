@@ -1,162 +1,90 @@
+import Alert from "../components/ui/Alert";
+import Button from "../components/ui/Button";
+import { aiRequest } from "../utils/aiControl";
 import { useEffect, useRef, useState } from "react";
 import RecipeList from "./../components/RecipeList";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useAuth } from "../context/AuthProvider";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../utils/supabaseClient";
+import { useAuth } from "../context/AuthContext";
+import { Link, Navigate } from "react-router-dom";
+import { dislikeRecipe } from "../utils/accountMutations";
 
-gsap.registerPlugin(ScrollTrigger);
 
 const RESULTS_PER_PAGE = 6;
 
-export default function MyRecommended() {
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
-  const sectionRef = useRef(null);
-  const { user, loading: userLoading } = useAuth();
+function RecommendationsWorkspace({ user }) {
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setPage] = useState(1);
   const [recommended, setRecommended] = useState([]);
-
-  const navigate = useNavigate();
-
-  // Use a ref to cache data between renders and tab switches
-  const cachedRecommendations = useRef(null);
-
-  useEffect(() => {
-    if (!user && !userLoading) {
-      navigate("/unauthorized");
-    }
-  }, [user, userLoading, navigate]);
+  const [resultError, setResultError] = useState("");
+  const [retry, setRetry] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const pending = useRef(new Map());
+  const active = useRef(true);
+  const totalElements = recommended.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / RESULTS_PER_PAGE));
+  const page = Math.min(currentPage, totalPages);
 
   useEffect(() => {
-    if (userLoading || !user?.id) return;
-
-    // If cached, just use cached data, skip fetch
-    if (cachedRecommendations.current) {
-      setRecommended(cachedRecommendations.current);
-      setTotalElements(cachedRecommendations.current.length);
-      setTotalPages(
-        Math.ceil(cachedRecommendations.current.length / RESULTS_PER_PAGE)
-      );
-      return;
-    }
-
-    async function fetchRecommendations() {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `https://letmecook.ca/api/recipes/recommend?userid=${user.id}`
-        );
-        const data = await res.json();
-        console.log("API response:", data);
-
-        const recipes = Array.isArray(data.content) ? data.content : [];
-
-        if (recipes.length > 0) {
-          const formatted = recipes.map((r) => ({
-            ...r,
-            cookingTime: r.time ?? r.cookingTime,
-          }));
-
-          cachedRecommendations.current = formatted;
-          setRecommended(formatted);
-          setTotalElements(formatted.length);
-          setTotalPages(Math.ceil(formatted.length / RESULTS_PER_PAGE));
-        } else {
-          // Fallback to latest picks
-          const fallbackRes = await fetch(
-            `https://letmecook.ca/api/recipes?sort=createdAt&size=20`
-          );
-          const fallbackData = await fallbackRes.json();
-          const fallbackRecipes = Array.isArray(fallbackData.content)
-            ? fallbackData.content
-            : [];
-
-          const formattedFallback = fallbackRecipes.map((r) => ({
-            ...r,
-            cookingTime: r.time ?? r.cookingTime,
-          }));
-
-          cachedRecommendations.current = formattedFallback;
-          setRecommended(formattedFallback);
-          setTotalElements(formattedFallback.length);
-          setTotalPages(Math.ceil(formattedFallback.length / RESULTS_PER_PAGE));
-        }
-      } catch (err) {
-        console.error("Failed to fetch recommendations:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchRecommendations();
-  }, [user, userLoading]);
-
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (el) {
-      gsap.fromTo(
-        el,
-        { opacity: 1, y: 100 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: el,
-            start: "top 100%",
-            toggleActions: "play none none none",
-          },
-        }
-      );
-    }
+    const requests = pending.current;
+    active.current = true;
+    return () => { active.current = false; requests.forEach(controller => controller.abort()); requests.clear(); };
   }, []);
 
-  const handleDislike = async (recipeId) => {
-    try {
-      const { error } = await supabase
-        .from("recipe_disliked")
-        .insert({ user_id: user.id, recipe_id: recipeId });
+  useEffect(() => {
+    const controller = new AbortController();
+    let current = true;
+    setLoading(true); setResultError(""); setRecommended([]); setPage(1);
+    aiRequest('/recipes/recommend', { signal: controller.signal, auth: 'required', actorId: user.id, timeoutMs: 30000, service: 'Recommendations' })
+      .then(data => {
+        if (!current || controller.signal.aborted) return;
+        const items = Array.isArray(data.content) ? data.content.map((r) => ({...r, cookingTime: r.time ?? r.cookingTime})) : [];
+        setRecommended(items);
+      }).catch((error) => { if (current && !controller.signal.aborted) setResultError(error.message); })
+      .finally(() => { if (current && !controller.signal.aborted) setLoading(false); });
+    return () => { current = false; controller.abort(); };
+  }, [user.id, retry]);
 
-      if (error) throw error;
+  const handleDislike = async (recipeId) => {
+    if (!active.current || pending.current.has(recipeId)) return;
+    const controller = new AbortController();
+    pending.current.set(recipeId, controller); setPendingCount(value => value + 1); setResultError('');
+    try {
+      await dislikeRecipe(recipeId,user.id,controller.signal);
+      if (controller.signal.aborted || !active.current) return;
 
       // remove the disliked recipe from view
-      const updated = recommended.filter((r) => r.id !== recipeId);
-      cachedRecommendations.current = updated;
-      setRecommended(updated);
-      setTotalElements(updated.length);
-      setTotalPages(Math.ceil(updated.length / RESULTS_PER_PAGE));
-    } catch (err) {
-      console.error("Failed to dislike recipe:", err.message);
+      setRecommended(previous => previous.filter((r) => r.id !== recipeId));
+    } catch {
+      if (!controller.signal.aborted && active.current) setResultError("Could not update your recommendations. Please try again.");
+    } finally {
+      if (pending.current.get(recipeId) === controller) {
+        pending.current.delete(recipeId);
+        if (active.current) setPendingCount(value => value - 1);
+      }
     }
   };
 
   return (
-    <section className="recommended-section" ref={sectionRef}>
+    <section className="recommended-section">
       <div className="all-recipes-bg" />
       <div className="layout-wrapper">
         <div className="recommended-header">
-          <h3 style={{ paddingBottom: "16px" }}>Recommended For You</h3>
+          <h3>Recommended for you</h3>
         </div>
 
-        <br />
-
+        {resultError && <Alert as="p" className="product-status">{resultError} <Button type="button" disabled={pendingCount > 0} onClick={() => { if (!pending.current.size) setRetry((value) => value + 1); }}>Retry</Button></Alert>}
+        {pendingCount > 0 && <p role="status">Updating your recommendations…</p>}
         {loading ? (
-          <div className="loading-message">Loading...</div>
+          <div className="loading-message" role="status">Loading recommendations…</div>
         ) : (
           <>
-            <RecipeList
+            {recommended.length > 0 && <RecipeList
               recipes={recommended.slice(
                 (page - 1) * RESULTS_PER_PAGE,
                 page * RESULTS_PER_PAGE
               )}
               onDislike={handleDislike}
-            />
-
-            <br />
+            />}
+            {!resultError && recommended.length === 0 && <div className="library-empty"><p>No recommendations yet.</p><Link to="/recipes" className="lmc-button lmc-button--secondary">Explore recipes</Link></div>}
 
             {recommended.length > 0 && (
               <div className="pagination-wrapper-recommended">
@@ -171,7 +99,7 @@ export default function MyRecommended() {
                 </div>
 
                 <div className="pagination-numbers">
-                  <span
+                  <Button type="button" aria-label="Previous recommendation page" disabled={page <= 1}
                     className={`page-prev ${page === 1 ? "disabled" : ""}`}
                     onClick={() => page > 1 && setPage(page - 1)}
                   >
@@ -182,7 +110,7 @@ export default function MyRecommended() {
                     >
                       <path d="M0 7L8 14L8 0L0 7Z" fill="#1E1E1E" />
                     </svg>
-                  </span>
+                  </Button>
 
                   {Array.from({ length: totalPages }, (_, i) => i + 1)
                     .filter((p) => {
@@ -201,19 +129,19 @@ export default function MyRecommended() {
                       return (
                         <span key={p} className="pagination-item">
                           {showDots && <span className="ellipsis">...</span>}
-                          <span
+                          <Button type="button" aria-label={`Recommendation page ${p}`} aria-current={p === page ? "page" : undefined}
                             className={`page-number ${
                               p === page ? "current" : ""
                             }`}
                             onClick={() => setPage(p)}
                           >
                             {p}
-                          </span>
+                          </Button>
                         </span>
                       );
                     })}
 
-                  <span
+                  <Button type="button" aria-label="Next recommendation page" disabled={page >= totalPages}
                     className={`page-next ${
                       page === totalPages ? "disabled" : ""
                     }`}
@@ -226,7 +154,7 @@ export default function MyRecommended() {
                     >
                       <path d="M8 7L0 14L0 0L8 7Z" fill="#1E1E1E" />
                     </svg>
-                  </span>
+                  </Button>
                 </div>
               </div>
             )}
@@ -235,4 +163,11 @@ export default function MyRecommended() {
       </div>
     </section>
   );
+}
+
+export default function MyRecommended() {
+  const { user, loading } = useAuth();
+  if (loading) return <p role="status">Checking your account…</p>;
+  if (!user) return <Navigate to="/unauthorized" replace/>;
+  return <RecommendationsWorkspace key={user.id} user={user}/>;
 }

@@ -1,0 +1,49 @@
+deploy/.env.local
+deploy/.env.roles
+deploy/*.log
+deploy/supabase/.temp/
+deploy/supabase/.branches/
+**/__pycache__/
+
+# Credentials belong to the operator, never to the source repository.
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+*.pem
+*.key
+
+# Local dependencies, build output and operating-system files.
+**/node_modules/
+**/.venv/
+**/venv/
+**/target/
+**/dist/
+**/coverage/
+**/.pytest_cache/
+.DS_Store
+**/.DS_Store
+**/.vscode/
+*.log
+*.pid
+
+# Recipe data, original-photo library and model/runtime artifacts are backed up separately.
+/client/public/recipe-images/
+/deploy/data/
+/deploy/tools/
+/RecommendationSystem/model/
+/RecommendationSystem/models/
+/RecommendationSystem/data/
+/RecommendationSystem/pipeline_status.txt
+*.pt
+*.pth
+*.onnx
+*.safetensors
+
+# Scratch work and generated design-review evidence.
+/work/
+/.impeccable/

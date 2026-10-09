@@ -1,3 +1,5 @@
+import Button from "../components/ui/Button";
+import Field from "../components/ui/Field";
 import { useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -13,41 +15,47 @@ export default function SearchBar() {
   };
 
   useEffect(() => {
-    const el = inputRef.current;
-    if (el) {
-      el.focus();
-      adjustHeight();
-    }
+    adjustHeight();
   }, []);
+
+  const openSunny = () => {
+    const prompt = inputRef.current.value.trim();
+    const params = new URLSearchParams();
+    if (prompt) params.set("prompt", prompt);
+    navigate(`/sunny${params.size ? `?${params}` : ""}`);
+  };
 
   const handleInput = () => {
     adjustHeight();
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
 
       const prompt = inputRef.current.value.trim();
       if (!prompt) return;
 
-      const params = new URLSearchParams();
-      params.append("prompt", prompt);
-      navigate(`/search?${params.toString()}`);
+      openSunny();
     }
   };
 
   return (
-    <div className="search-box">
+    <form className="search-box" onSubmit={(event) => { event.preventDefault(); openSunny(); }}>
       <div className="search-inner">
+        <Field htmlFor="home-sunny-prompt">What would you like to cook?</Field>
         <textarea
+          id="home-sunny-prompt"
           ref={inputRef}
+          rows={2}
           className="search-input"
-          placeholder="Type anything: “I want Asian dish that's vegan” or “I want dinner with salmon”"
+          placeholder="Chicken, mushrooms, 30 minutes…"
+          maxLength={2000}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
         />
+        <div className="home-search-footer"><Button type="submit" className="home-sunny-submit">Ask Sunny</Button></div>
       </div>
-    </div>
+    </form>
   );
 }

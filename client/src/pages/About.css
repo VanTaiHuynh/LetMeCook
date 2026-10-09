@@ -1,0 +1,59 @@
+.information-about .about-purpose > p + p {
+  margin-top: 16px;
+}
+
+.information-about .about-story {
+  margin-top: 32px;
+}
+
+.information-about .about-story > section {
+  padding-block: 24px;
+  border-top: 1px solid var(--lmc-line);
+}
+
+.information-about .about-story h3 {
+  margin: 0 0 12px;
+  font-size: 1.375rem;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.information-about .about-story p {
+  margin: 0;
+  color: var(--lmc-muted);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.information-about .about-notes {
+  max-width: 75ch;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lmc-line);
+}
+
+.information-about .about-sources {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.information-about .about-sources summary,
+.information-about .about-sources .information-detail-content p,
+.information-about .about-privacy {
+  font-size: .875rem;
+}
+
+.information-about .about-sources .information-detail-content {
+  padding-top: 8px;
+}
+
+.information-about .about-privacy {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--lmc-ink);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
